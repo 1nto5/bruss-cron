@@ -147,8 +147,8 @@ cron.schedule('0 * * * *', async () => {
   await errorCollector.sendBatchNotification();
 });
 
-// Schedule batch temperature outlier notification every hour at minute 0
-cron.schedule('0 * * * *', async () => {
+// Schedule batch temperature outlier notification daily at 9:00 AM
+cron.schedule('0 9 * * *', async () => {
   await temperatureOutlierCollector.sendBatchNotification();
 });
 

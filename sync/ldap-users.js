@@ -66,25 +66,13 @@ export async function syncLdapUsers() {
       addedUsers = result.upsertedCount;
     }
 
-    // Remove users who no longer exist in LDAP
+    // Remove users who no longer exist in LDAP (single atomic query)
     if (activeEmails.size > 0) {
       try {
-        // Get all users from the database
-        const allUsers = await usersCollection.find({}).toArray();
-
-        // Find users that need to be removed (not in active set)
-        const usersToRemove = allUsers.filter(
-          (user) => !activeEmails.has(user.email)
-        );
-
-        if (usersToRemove.length > 0) {
-          // Remove users that no longer exist in LDAP
-          const emailsToRemove = usersToRemove.map((u) => u.email);
-          const deleteResult = await usersCollection.deleteMany({
-            email: { $in: emailsToRemove },
-          });
-          deletedUsers = deleteResult.deletedCount;
-        }
+        const deleteResult = await usersCollection.deleteMany({
+          email: { $nin: Array.from(activeEmails) },
+        });
+        deletedUsers = deleteResult.deletedCount;
       } catch (cleanupError) {
         console.error('Error during cleanup of inactive users:', cleanupError);
         throw cleanupError; // Re-throw to allow executeWithErrorNotification to handle it

@@ -51,11 +51,11 @@ async function syncR2platnikEmployees() {
       const currentEmployees = await employeesCollection
         .find({}, { projection: { identifier: 1 } })
         .toArray();
-      const currentIdentifiers = currentEmployees.map((emp) => emp.identifier);
+      const currentIdentifiersSet = new Set(currentEmployees.map((emp) => emp.identifier));
 
       // Track new employees
       for (const emp of employees) {
-        if (!currentIdentifiers.includes(emp.identifier)) {
+        if (!currentIdentifiersSet.has(emp.identifier)) {
           addedEmployees++;
         }
       }

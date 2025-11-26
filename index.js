@@ -52,8 +52,8 @@ cron.schedule(
 
 // Production overtime tasks
 // -------------------------------
-// Schedule sending of pending production overtime email notifications every workday at 3:00
-cron.schedule('0 3 * * 1-5', async () => {
+// Schedule sending of pending production overtime email notifications every workday at 3:05
+cron.schedule('5 3 * * 1-5', async () => {
   await executeJobWithStatusTracking(
     'sendOvertimeApprovalReminders',
     sendOvertimeApprovalReminders
@@ -69,8 +69,8 @@ cron.schedule('0 9 * * 1-5', async () => {
 
 // HR Training Evaluation Notifications
 // ------------------------------------
-// Schedule HR training evaluation deadline notifications every workday at 3:00
-cron.schedule('0 3 * * 1-5', async () => {
+// Schedule HR training evaluation deadline notifications every workday at 3:10
+cron.schedule('10 3 * * 1-5', async () => {
   await executeJobWithStatusTracking(
     'sendHrTrainingEvaluationNotifications',
     sendHrTrainingEvaluationNotifications
@@ -86,8 +86,8 @@ cron.schedule('0 16 * * 1-5', async () => {
     syncR2platnikEmployees
   );
 });
-// Schedule synchronization of LDAP users every workday at 16:00
-cron.schedule('0 16 * * 1-5', async () => {
+// Schedule synchronization of LDAP users every workday at 16:10
+cron.schedule('10 16 * * 1-5', async () => {
   await executeJobWithStatusTracking('syncLdapUsers', syncLdapUsers);
 });
 
@@ -105,23 +105,23 @@ cron.schedule('0 7 * * *', async () => {
   await executeJobWithStatusTracking('monitorLv1Backup', monitorLv1Backup);
 });
 
-// Monitor LV2 Zasoby backup daily at 07:00 (before daily summary at 08:00)
-cron.schedule('0 7 * * *', async () => {
+// Monitor LV2 Zasoby backup daily at 07:03
+cron.schedule('3 7 * * *', async () => {
   await executeJobWithStatusTracking('monitorLv2Backup', monitorLv2Backup);
 });
 
-// Monitor LV1 SQL backup daily at 07:00 (before daily summary at 08:00)
-cron.schedule('0 7 * * *', async () => {
+// Monitor LV1 SQL backup daily at 07:06
+cron.schedule('6 7 * * *', async () => {
   await executeJobWithStatusTracking('monitorSqlLv1Backup', monitorSqlLv1Backup);
 });
 
-// Monitor LV2 SQL backup daily at 07:00 (before daily summary at 08:00)
-cron.schedule('0 7 * * *', async () => {
+// Monitor LV2 SQL backup daily at 07:09
+cron.schedule('9 7 * * *', async () => {
   await executeJobWithStatusTracking('monitorSqlLv2Backup', monitorSqlLv2Backup);
 });
 
-// Monitor EOL308 backup daily at 07:00 (before daily summary at 08:00)
-cron.schedule('0 7 * * *', async () => {
+// Monitor EOL308 backup daily at 07:12
+cron.schedule('12 7 * * *', async () => {
   await executeJobWithStatusTracking(
     'monitorEOL308Backup',
     monitorEOL308Backup

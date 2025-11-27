@@ -37,54 +37,42 @@ export async function syncLdapUsers() {
 
     processedUsers = searchResults.length;
 
-    // Process search results
+    // Process search results - collect bulk operations
+    const bulkOps = [];
     for (const ldapUser of searchResults) {
       if (ldapUser.mail) {
         const email = Array.isArray(ldapUser.mail)
           ? ldapUser.mail[0].toLowerCase()
           : ldapUser.mail.toLowerCase();
 
-        // Add to active emails set
         activeEmails.add(email);
 
-        // Check if user exists, if not create with default role
-        const user = await usersCollection.findOne({ email });
-        if (!user) {
-          await usersCollection.insertOne({
-            email,
-            roles: ['user'],
-            lastSyncedAt: new Date(),
-            displayName: ldapUser.cn || email,
-          });
-          addedUsers++;
-        } else {
-          // Update last synced timestamp
-          await usersCollection.updateOne(
-            { email },
-            { $set: { lastSyncedAt: new Date() } }
-          );
-        }
+        bulkOps.push({
+          updateOne: {
+            filter: { email },
+            update: {
+              $set: { lastSyncedAt: new Date(), displayName: ldapUser.cn || email },
+              $setOnInsert: { email, roles: ['user'] },
+            },
+            upsert: true,
+          },
+        });
       }
     }
 
-    // Remove users who no longer exist in LDAP
+    // Execute bulk operations
+    if (bulkOps.length > 0) {
+      const result = await usersCollection.bulkWrite(bulkOps, { ordered: false });
+      addedUsers = result.upsertedCount;
+    }
+
+    // Remove users who no longer exist in LDAP (single atomic query)
     if (activeEmails.size > 0) {
       try {
-        // Get all users from the database
-        const allUsers = await usersCollection.find({}).toArray();
-
-        // Find users that need to be removed (not in active set)
-        const usersToRemove = allUsers.filter(
-          (user) => !activeEmails.has(user.email)
-        );
-
-        if (usersToRemove.length > 0) {
-          // Remove users that no longer exist in LDAP
-          for (const userToRemove of usersToRemove) {
-            await usersCollection.deleteOne({ email: userToRemove.email });
-            deletedUsers++;
-          }
-        }
+        const deleteResult = await usersCollection.deleteMany({
+          email: { $nin: Array.from(activeEmails) },
+        });
+        deletedUsers = deleteResult.deletedCount;
       } catch (cleanupError) {
         console.error('Error during cleanup of inactive users:', cleanupError);
         throw cleanupError; // Re-throw to allow executeWithErrorNotification to handle it

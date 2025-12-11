@@ -71,6 +71,7 @@ export async function syncLdapUsers() {
       try {
         const deleteResult = await usersCollection.deleteMany({
           email: { $nin: Array.from(activeEmails) },
+          source: { $ne: 'manual' }, // preserve manual users
         });
         deletedUsers = deleteResult.deletedCount;
       } catch (cleanupError) {

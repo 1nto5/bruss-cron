@@ -1,18 +1,21 @@
 import axios from 'axios';
 import dotenv from 'dotenv';
 import { dbc } from '../lib/mongo.js';
+import {
+  OVERTIME,
+  trilingualSubject,
+  trilingualHtml,
+} from '../lib/email-translations.js';
 
 dotenv.config();
 
-// Helper function to create email content
-function createEmailContent(message, overtimeUrl) {
-  return `
-    <div>
-      <p>${message}</p>
-      <p>
-        <a href="${overtimeUrl}" style="display:inline-block;padding:10px 20px;font-size:16px;color:white;background-color:#007bff;text-decoration:none;border-radius:5px;">Przejdź do zleceń</a>
-      </p>
-    </div>`;
+// Helper function to create trilingual email content
+function createEmailContent(messages, overtimeUrl) {
+  return trilingualHtml(
+    { PL: `<p>${messages.PL}</p>`, EN: `<p>${messages.EN}</p>`, DE: `<p>${messages.DE}</p>` },
+    overtimeUrl,
+    OVERTIME.buttons.goToOrders
+  );
 }
 
 /**
@@ -61,16 +64,11 @@ async function sendOvertimeApprovalReminders() {
         continue;
       }
 
-      // Prepare simple email content with count and link
-      const subject =
-        'Oczekujące zlecania wykonania pracy w godzinach nadliczbowych - produkcja';
-      const message = `Masz ${pendingRequests.length} ${
-        pendingRequests.length === 1
-          ? 'oczekujące zlecenie'
-          : 'oczekujące zlecenia'
-      } wykonania pracy w godzinach nadliczbowych - produkcja.`;
+      // Prepare trilingual email content with count and link
+      const subject = trilingualSubject(OVERTIME.subjects.pendingApproval);
+      const messages = OVERTIME.messages.pendingCount(pendingRequests.length);
       const overtimeUrl = `${process.env.APP_URL}/production-overtime`;
-      const html = createEmailContent(message, overtimeUrl);
+      const html = createEmailContent(messages, overtimeUrl);
 
       try {
         // Use the API to send email
@@ -150,16 +148,11 @@ async function sendCompletedTaskAttendanceReminders() {
     // Send reminder to each responsible employee
     for (const [employeeEmail, tasks] of tasksByEmployee) {
       try {
-        const subject =
-          'Zlecenia wykonania pracy w godzinach nadliczbowych - produkcja - oczekuje na dodanie listy obecności';
+        const subject = trilingualSubject(OVERTIME.subjects.attendanceReminder);
         const taskCount = tasks.length;
-        const message = `${
-          taskCount === 1
-            ? 'Zlecenie wykonania pracy w godzinach nadliczbowych - produkcja oczekuje'
-            : `${taskCount} zleceń wykonania pracy w godzinach nadliczbowych - produkcja oczekuje`
-        } na dodanie listy obecności.`;
+        const messages = OVERTIME.messages.attendanceCount(taskCount);
         const overtimeUrl = `${process.env.APP_URL}/production-overtime`;
-        const html = createEmailContent(message, overtimeUrl);
+        const html = createEmailContent(messages, overtimeUrl);
 
         // Send email using existing API
         const apiUrl = new URL(`${process.env.API_URL}/mailer`);

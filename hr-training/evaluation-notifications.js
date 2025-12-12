@@ -2,6 +2,12 @@ import axios from 'axios';
 import dotenv from 'dotenv';
 import fs from 'fs';
 import XLSX from 'xlsx';
+import {
+  HR_TRAINING,
+  trilingualSubject,
+  trilingualHtml,
+  escapeHtml,
+} from '../lib/email-translations.js';
 
 dotenv.config();
 
@@ -79,33 +85,61 @@ function convertNameToEmail(fullName) {
 }
 
 /**
- * Helper function to create Polish email content for HR training evaluation reminders
+ * Helper function to create trilingual email content for HR training evaluation reminders
  */
 function createHrTrainingEvaluationEmailContent(
   supervisorName,
   trainingName,
   evaluationDeadline
 ) {
-  const formattedDate = new Date(evaluationDeadline).toLocaleDateString(
-    'pl-PL'
-  );
-  const firstName = supervisorName
-    ? supervisorName.split(' ')[1] || supervisorName
-    : '';
+  const deadlineDate = new Date(evaluationDeadline);
+  const formattedDatePL = deadlineDate.toLocaleDateString('pl-PL');
+  const formattedDateEN = deadlineDate.toLocaleDateString('en-GB');
+  const formattedDateDE = deadlineDate.toLocaleDateString('de-DE');
 
-  return `
-    <div>
-      <p>Dzień dobry${firstName ? ` ${firstName}` : ''},</p>
-      <p>W dniu <strong>${formattedDate}</strong> mija termin wymaganego dokonania oceny efektywności zrealizowanych szkoleń w Twoim zespole.</p>
-      <p><strong>Szkolenie:</strong> ${trainingName}</p>
-      <p>
-        Proszę o pilne dokonanie oceny efektywności tych szkoleń w dostępnym pliku:
-        <strong>W:\\HrManagement\\1_Szkolenia\\2_PHR-7.2.01-01_PLAN SZKOLEŃ</strong>.
-      </p>
-      <p>Pomoże nam to w przyszłości w podjęciu decyzji dotyczących szkoleń w podobnych obszarach lub tematyce.</p>
-      <p>W razie pytań lub wątpliwości, skontaktuj się z działem HR.<br/>Z góry bardzo dziękujemy za rzetelność i terminowość.</p>
-      <p style="margin-top:2em;">Z poważaniem,<br/>Dział HR</p>
-    </div>`;
+  const nameParts = supervisorName ? supervisorName.trim().split(/\s+/) : [];
+  const firstName = nameParts.length >= 2 ? nameParts[1] : (nameParts[0] || '');
+  const safeTrainingName = escapeHtml(trainingName);
+
+  const greeting = HR_TRAINING.messages.greeting(firstName);
+  const deadlineInfo = HR_TRAINING.messages.deadlineInfo(formattedDatePL, formattedDateEN, formattedDateDE);
+  const trainingLabel = HR_TRAINING.messages.trainingLabel;
+  const filePathInfo = HR_TRAINING.messages.filePathInfo;
+  const helpInfo = HR_TRAINING.messages.helpInfo;
+  const contactInfo = HR_TRAINING.messages.contactInfo;
+  const signature = HR_TRAINING.messages.signature;
+
+  const contentByLang = {
+    PL: `
+      <p>${greeting.PL}</p>
+      <p>${deadlineInfo.PL}</p>
+      <p><strong>${trainingLabel.PL}</strong> ${safeTrainingName}</p>
+      <p>${filePathInfo.PL}</p>
+      <p>${helpInfo.PL}</p>
+      <p>${contactInfo.PL}</p>
+      <p style="margin-top:2em;">${signature.PL}</p>
+    `,
+    EN: `
+      <p>${greeting.EN}</p>
+      <p>${deadlineInfo.EN}</p>
+      <p><strong>${trainingLabel.EN}</strong> ${safeTrainingName}</p>
+      <p>${filePathInfo.EN}</p>
+      <p>${helpInfo.EN}</p>
+      <p>${contactInfo.EN}</p>
+      <p style="margin-top:2em;">${signature.EN}</p>
+    `,
+    DE: `
+      <p>${greeting.DE}</p>
+      <p>${deadlineInfo.DE}</p>
+      <p><strong>${trainingLabel.DE}</strong> ${safeTrainingName}</p>
+      <p>${filePathInfo.DE}</p>
+      <p>${helpInfo.DE}</p>
+      <p>${contactInfo.DE}</p>
+      <p style="margin-top:2em;">${signature.DE}</p>
+    `,
+  };
+
+  return trilingualHtml(contentByLang);
 }
 
 /**
@@ -167,12 +201,12 @@ export async function sendHrTrainingEvaluationNotification(
   excelFilePath
 ) {
   try {
-    const subject = `Przypomnienie HR: Ocena efektywności szkoleń - ${trainingName}`;
+    const subjectTranslations = HR_TRAINING.subjects.evaluationReminder(trainingName);
+    const subject = trilingualSubject(subjectTranslations);
     const html = createHrTrainingEvaluationEmailContent(
       supervisorName,
       trainingName,
-      evaluationDeadline,
-      excelFilePath
+      evaluationDeadline
     );
 
     if (process.env.NODE_ENV === 'development') {

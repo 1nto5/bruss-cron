@@ -6,7 +6,7 @@ import {
   HR_TRAINING,
   trilingualSubject,
   trilingualHtml,
-  LANG_COLORS,
+  escapeHtml,
 } from '../lib/email-translations.js';
 
 dotenv.config();
@@ -92,11 +92,17 @@ function createHrTrainingEvaluationEmailContent(
   trainingName,
   evaluationDeadline
 ) {
-  const formattedDate = new Date(evaluationDeadline).toLocaleDateString('pl-PL');
-  const firstName = supervisorName ? supervisorName.split(' ')[1] || supervisorName : '';
+  const deadlineDate = new Date(evaluationDeadline);
+  const formattedDatePL = deadlineDate.toLocaleDateString('pl-PL');
+  const formattedDateEN = deadlineDate.toLocaleDateString('en-GB');
+  const formattedDateDE = deadlineDate.toLocaleDateString('de-DE');
+
+  const nameParts = supervisorName ? supervisorName.trim().split(/\s+/) : [];
+  const firstName = nameParts.length >= 2 ? nameParts[1] : (nameParts[0] || '');
+  const safeTrainingName = escapeHtml(trainingName);
 
   const greeting = HR_TRAINING.messages.greeting(firstName);
-  const deadlineInfo = HR_TRAINING.messages.deadlineInfo(formattedDate);
+  const deadlineInfo = HR_TRAINING.messages.deadlineInfo(formattedDatePL, formattedDateEN, formattedDateDE);
   const trainingLabel = HR_TRAINING.messages.trainingLabel;
   const filePathInfo = HR_TRAINING.messages.filePathInfo;
   const helpInfo = HR_TRAINING.messages.helpInfo;
@@ -107,7 +113,7 @@ function createHrTrainingEvaluationEmailContent(
     PL: `
       <p>${greeting.PL}</p>
       <p>${deadlineInfo.PL}</p>
-      <p><strong>${trainingLabel.PL}</strong> ${trainingName}</p>
+      <p><strong>${trainingLabel.PL}</strong> ${safeTrainingName}</p>
       <p>${filePathInfo.PL}</p>
       <p>${helpInfo.PL}</p>
       <p>${contactInfo.PL}</p>
@@ -116,7 +122,7 @@ function createHrTrainingEvaluationEmailContent(
     EN: `
       <p>${greeting.EN}</p>
       <p>${deadlineInfo.EN}</p>
-      <p><strong>${trainingLabel.EN}</strong> ${trainingName}</p>
+      <p><strong>${trainingLabel.EN}</strong> ${safeTrainingName}</p>
       <p>${filePathInfo.EN}</p>
       <p>${helpInfo.EN}</p>
       <p>${contactInfo.EN}</p>
@@ -125,7 +131,7 @@ function createHrTrainingEvaluationEmailContent(
     DE: `
       <p>${greeting.DE}</p>
       <p>${deadlineInfo.DE}</p>
-      <p><strong>${trainingLabel.DE}</strong> ${trainingName}</p>
+      <p><strong>${trainingLabel.DE}</strong> ${safeTrainingName}</p>
       <p>${filePathInfo.DE}</p>
       <p>${helpInfo.DE}</p>
       <p>${contactInfo.DE}</p>

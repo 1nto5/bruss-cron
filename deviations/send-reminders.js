@@ -5,7 +5,6 @@ import {
   DEVIATIONS,
   trilingualSubject,
   trilingualHtml,
-  formatArea,
 } from '../lib/email-translations.js';
 
 dotenv.config();
@@ -119,7 +118,7 @@ async function sendDeviationApprovalReminders() {
             if (!pm.email) continue;
             const subjectTranslations = DEVIATIONS.subjects.vacancy(deviation.internalId, role);
             const subject = trilingualSubject(subjectTranslations);
-            const messages = DEVIATIONS.messages.vacancy(deviation.internalId, role, deviation.area);
+            const messages = DEVIATIONS.messages.vacancy(deviation.internalId, role);
             const html = createEmailContent(messages, deviationUrl);
             try {
               const apiUrl = new URL(`${process.env.API_URL}/mailer`);
@@ -180,7 +179,7 @@ async function sendDeviationApprovalReminders() {
             if (!pm.email) continue;
             const subjectTranslations = DEVIATIONS.subjects.vacancy(deviation.internalId, role);
             const subject = trilingualSubject(subjectTranslations);
-            const messages = DEVIATIONS.messages.vacancy(deviation.internalId, role, null);
+            const messages = DEVIATIONS.messages.vacancy(deviation.internalId, role);
             const html = createEmailContent(messages, deviationUrl);
             try {
               const apiUrl = new URL(`${process.env.API_URL}/mailer`);

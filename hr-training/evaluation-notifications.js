@@ -13,7 +13,7 @@ dotenv.config();
 
 // HR Training Evaluation Configuration
 const HR_TRAINING_CONFIG = {
-  excelFilePath: 'C:\\cron-temp-files\\hr-trainings.xlsx',
+  excelFilePath: process.env.HR_TRAINING_EXCEL_FILE_PATH || 'C:\\cron-temp-files\\hr-trainings.xlsx',
   evaluationDeadlineColumn: process.env.HR_TRAINING_DEADLINE_COLUMN || 'Z', // Column Z contains the deadline date
   supervisorNameColumn: process.env.HR_TRAINING_NAME_COLUMN || 'W', // Column W contains supervisor names (surname firstname)
   trainingNameColumn: process.env.HR_TRAINING_TRAINING_NAME_COLUMN || 'C', // Column C contains training names

@@ -25,6 +25,35 @@ import { syncR2platnikEmployees } from './sync/r2platnik-employees.js';
 
 dotenv.config();
 
+// Validate required environment variables at startup
+function validateEnv() {
+  const required = ['MONGO_URI', 'API_URL', 'ADMIN_EMAIL', 'APP_URL'];
+  const missing = required.filter((key) => !process.env[key]);
+
+  if (missing.length > 0) {
+    console.error(`Missing required env vars: ${missing.join(', ')}`);
+    process.exit(1);
+  }
+
+  // Warn about optional but important vars
+  const optional = {
+    LDAP_URL: 'LDAP sync disabled',
+    R2PLATNIK_SQL_SERVER: 'R2platnik sync disabled',
+    SYNOLOGY_BACKUP_HOST: 'Backup monitoring disabled',
+    CONTROLLINO_API_KEY: 'Temperature monitoring disabled',
+  };
+
+  Object.entries(optional).forEach(([key, msg]) => {
+    if (!process.env[key]) {
+      console.warn(`[env] ${key} not set - ${msg}`);
+    }
+  });
+
+  console.log('Environment validation passed');
+}
+
+validateEnv();
+
 // Deviations tasks
 // -----------------------
 // Schedule sending of pending deviation approval notifications every workday at 03:00

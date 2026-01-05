@@ -10,8 +10,27 @@ dotenv.config();
 const fileState = new Map();
 
 // Log directory and app names to monitor
-const LOG_DIR = 'C:\\ProgramData\\pm2\\home\\logs';
+const LOG_DIR = process.env.PM2_LOG_DIR || 'C:\\ProgramData\\pm2\\home\\logs';
 const APP_NAMES = ['bruss-floor', 'bruss-intra', 'bruss-cron'];
+
+/**
+ * Clean up fileState entries for files that no longer exist
+ * Prevents memory leak from rotated/deleted log files
+ */
+async function cleanupStaleEntries() {
+  const existingFiles = new Set();
+  for (const appName of APP_NAMES) {
+    const files = await findErrorLogFiles(appName);
+    files.forEach((f) => existingFiles.add(f));
+  }
+
+  // Remove entries for files that no longer exist
+  for (const filePath of fileState.keys()) {
+    if (!existingFiles.has(filePath)) {
+      fileState.delete(filePath);
+    }
+  }
+}
 
 /**
  * Find all error log files for an application
@@ -148,6 +167,9 @@ ${errorContent}
  * Monitor PM2 error log files and send notifications when errors are detected
  */
 export async function monitorPm2ErrorLogs() {
+  // Clean up stale entries to prevent memory leak
+  await cleanupStaleEntries();
+
   const results = [];
   const logFiles = await getLogFiles();
 

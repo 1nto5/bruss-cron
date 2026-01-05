@@ -71,18 +71,15 @@ async function sendOvertimeApprovalReminders() {
       const html = createEmailContent(messages, overtimeUrl);
 
       try {
-        // Use the API to send email
-        let apiUrlBase;
         if (!process.env.API_URL) {
           throw new Error('API environment variable is not defined');
         }
-        apiUrlBase = process.env.API_URL;
-        const apiUrl = new URL(`${apiUrlBase}/mailer`);
-        apiUrl.searchParams.append('to', manager.email);
-        apiUrl.searchParams.append('subject', subject);
-        apiUrl.searchParams.append('html', html);
 
-        await axios.get(apiUrl.toString());
+        await axios.post(`${process.env.API_URL}/mailer`, {
+          to: manager.email,
+          subject,
+          html,
+        });
         emailsSent++;
       } catch (error) {
         console.error(`Error sending email:`, error);
@@ -154,13 +151,11 @@ async function sendCompletedTaskAttendanceReminders() {
         const overtimeUrl = `${process.env.APP_URL}/production-overtime`;
         const html = createEmailContent(messages, overtimeUrl);
 
-        // Send email using existing API
-        const apiUrl = new URL(`${process.env.API_URL}/mailer`);
-        apiUrl.searchParams.append('to', employeeEmail);
-        apiUrl.searchParams.append('subject', subject);
-        apiUrl.searchParams.append('html', html);
-
-        await axios.get(apiUrl.toString());
+        await axios.post(`${process.env.API_URL}/mailer`, {
+          to: employeeEmail,
+          subject,
+          html,
+        });
         emailsSent++;
       } catch (error) {
         console.error(`Error sending completed task reminder email:`, error);

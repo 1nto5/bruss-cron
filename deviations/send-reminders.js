@@ -40,6 +40,7 @@ async function sendDeviationApprovalReminders() {
   }
 
   let remindersSent = 0;
+  let emailErrors = 0;
 
   for (const deviation of pendingDeviations) {
     // Array to collect notification logs for this deviation
@@ -80,11 +81,11 @@ async function sendDeviationApprovalReminders() {
         const html = createEmailContent(messages, deviationUrl);
 
         try {
-          const apiUrl = new URL(`${process.env.API_URL}/mailer`);
-          apiUrl.searchParams.append('to', pm.email);
-          apiUrl.searchParams.append('subject', subject);
-          apiUrl.searchParams.append('html', html);
-          await axios.get(apiUrl.toString());
+          await axios.post(`${process.env.API_URL}/mailer`, {
+            to: pm.email,
+            subject,
+            html,
+          });
 
           // Log the notification
           notificationLogs.push({
@@ -95,7 +96,8 @@ async function sendDeviationApprovalReminders() {
 
           remindersSent++;
         } catch (e) {
-          console.error(`Error sending plant manager reminder:`, e);
+          console.error(`Error sending plant manager reminder to ${pm.email}:`, e.message);
+          emailErrors++;
         }
       }
     }
@@ -121,11 +123,11 @@ async function sendDeviationApprovalReminders() {
             const messages = DEVIATIONS.messages.vacancy(deviation.internalId, role);
             const html = createEmailContent(messages, deviationUrl);
             try {
-              const apiUrl = new URL(`${process.env.API_URL}/mailer`);
-              apiUrl.searchParams.append('to', pm.email);
-              apiUrl.searchParams.append('subject', subject);
-              apiUrl.searchParams.append('html', html);
-              await axios.get(apiUrl.toString());
+              await axios.post(`${process.env.API_URL}/mailer`, {
+                to: pm.email,
+                subject,
+                html,
+              });
 
               // Log the notification
               notificationLogs.push({
@@ -136,7 +138,8 @@ async function sendDeviationApprovalReminders() {
 
               remindersSent++;
             } catch (e) {
-              console.error(`Error sending vacancy mail to PM:`, e);
+              console.error(`Error sending vacancy mail to ${pm.email}:`, e.message);
+              emailErrors++;
             }
           }
           continue;
@@ -149,11 +152,11 @@ async function sendDeviationApprovalReminders() {
           const messages = DEVIATIONS.messages.awaitingRole(deviation.internalId, role);
           const html = createEmailContent(messages, deviationUrl);
           try {
-            const apiUrl = new URL(`${process.env.API_URL}/mailer`);
-            apiUrl.searchParams.append('to', user.email);
-            apiUrl.searchParams.append('subject', subject);
-            apiUrl.searchParams.append('html', html);
-            await axios.get(apiUrl.toString());
+            await axios.post(`${process.env.API_URL}/mailer`, {
+              to: user.email,
+              subject,
+              html,
+            });
 
             // Log the notification
             notificationLogs.push({
@@ -164,7 +167,8 @@ async function sendDeviationApprovalReminders() {
 
             remindersSent++;
           } catch (e) {
-            console.error(`Error sending reminder mail to GL:`, e);
+            console.error(`Error sending reminder mail to ${user.email}:`, e.message);
+            emailErrors++;
           }
         }
       } else {
@@ -182,11 +186,11 @@ async function sendDeviationApprovalReminders() {
             const messages = DEVIATIONS.messages.vacancy(deviation.internalId, role);
             const html = createEmailContent(messages, deviationUrl);
             try {
-              const apiUrl = new URL(`${process.env.API_URL}/mailer`);
-              apiUrl.searchParams.append('to', pm.email);
-              apiUrl.searchParams.append('subject', subject);
-              apiUrl.searchParams.append('html', html);
-              await axios.get(apiUrl.toString());
+              await axios.post(`${process.env.API_URL}/mailer`, {
+                to: pm.email,
+                subject,
+                html,
+              });
 
               // Log the notification
               notificationLogs.push({
@@ -197,7 +201,8 @@ async function sendDeviationApprovalReminders() {
 
               remindersSent++;
             } catch (e) {
-              console.error(`Error sending vacancy mail to PM:`, e);
+              console.error(`Error sending vacancy mail to ${pm.email}:`, e.message);
+              emailErrors++;
             }
           }
           continue;
@@ -210,11 +215,11 @@ async function sendDeviationApprovalReminders() {
           const messages = DEVIATIONS.messages.awaitingRole(deviation.internalId, role);
           const html = createEmailContent(messages, deviationUrl);
           try {
-            const apiUrl = new URL(`${process.env.API_URL}/mailer`);
-            apiUrl.searchParams.append('to', user.email);
-            apiUrl.searchParams.append('subject', subject);
-            apiUrl.searchParams.append('html', html);
-            await axios.get(apiUrl.toString());
+            await axios.post(`${process.env.API_URL}/mailer`, {
+              to: user.email,
+              subject,
+              html,
+            });
 
             // Log the notification
             notificationLogs.push({
@@ -225,7 +230,8 @@ async function sendDeviationApprovalReminders() {
 
             remindersSent++;
           } catch (e) {
-            console.error(`Error sending reminder mail to ${role}:`, e);
+            console.error(`Error sending reminder mail to ${user.email}:`, e.message);
+            emailErrors++;
           }
         }
       }
@@ -250,7 +256,7 @@ async function sendDeviationApprovalReminders() {
   console.log(
     `sendDeviationApprovalReminders -> success at ${now.toLocaleString()} | Processed: ${
       pendingDeviations.length
-    }, Reminders: ${remindersSent}`
+    }, Reminders: ${remindersSent}, Errors: ${emailErrors}`
   );
 }
 

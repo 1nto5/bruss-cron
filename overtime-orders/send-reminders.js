@@ -19,11 +19,11 @@ function createEmailContent(messages, overtimeUrl) {
 }
 
 /**
- * Sends email notifications about pending production overtime requests
+ * Sends email notifications about pending overtime orders
  * - Production managers: pending non-logistics orders (awaiting pre-approval)
  * - Plant managers: pending logistics orders + pre_approved orders (awaiting final approval)
  */
-async function sendProductionOvertimeApprovalReminders() {
+async function sendOvertimeOrdersApprovalReminders() {
   let pendingForPreApproval = 0;
   let pendingForFinalApproval = 0;
   let productionManagerCount = 0;
@@ -32,7 +32,7 @@ async function sendProductionOvertimeApprovalReminders() {
   let emailErrors = 0;
 
   try {
-    const coll = await dbc('production_overtime');
+    const coll = await dbc('overtime_orders');
     const usersColl = await dbc('users');
 
     // Query 1: Pending non-logistics → for production-manager (pre-approval)
@@ -49,7 +49,7 @@ async function sendProductionOvertimeApprovalReminders() {
     pendingForPreApproval = pendingNonLogistics.length;
     pendingForFinalApproval = pendingLogistics.length + preApprovedOrders.length;
 
-    const overtimeUrl = `${process.env.APP_URL}/production-overtime`;
+    const overtimeUrl = `${process.env.APP_URL}/overtime-orders`;
 
     // Send to production managers if there are pending non-logistics orders
     if (pendingForPreApproval > 0) {
@@ -120,12 +120,12 @@ async function sendProductionOvertimeApprovalReminders() {
       }
     }
   } catch (error) {
-    console.error('Error in sendProductionOvertimeApprovalReminders:', error);
+    console.error('Error in sendOvertimeOrdersApprovalReminders:', error);
     throw error;
   }
 
   console.log(
-    `sendProductionOvertimeApprovalReminders -> success at ${new Date().toLocaleString()} | ` +
+    `sendOvertimeOrdersApprovalReminders -> success at ${new Date().toLocaleString()} | ` +
       `PreApproval: ${pendingForPreApproval} (PM: ${productionManagerCount}), ` +
       `FinalApproval: ${pendingForFinalApproval} (Plant: ${plantManagerCount}), ` +
       `Emails: ${emailsSent}, Errors: ${emailErrors}`
@@ -133,16 +133,16 @@ async function sendProductionOvertimeApprovalReminders() {
 }
 
 /**
- * Checks for approved completed production overtime tasks and sends reminders
+ * Checks for approved completed overtime orders and sends reminders
  * to responsible employees to add attendance lists
  */
-async function sendProductionOvertimeAttendanceReminders() {
+async function sendOvertimeOrdersAttendanceReminders() {
   let totalCompletedTasks = 0;
   let emailsSent = 0;
   let emailErrors = 0;
 
   try {
-    const coll = await dbc('production_overtime');
+    const coll = await dbc('overtime_orders');
 
     // Find approved tasks that are completed but may need attendance list updates
     const yesterday = new Date();
@@ -160,7 +160,7 @@ async function sendProductionOvertimeAttendanceReminders() {
 
     if (completedTasks.length === 0) {
       console.log(
-        `sendProductionOvertimeAttendanceReminders -> success at ${new Date().toLocaleString()} | Completed tasks: 0, Emails: 0`
+        `sendOvertimeOrdersAttendanceReminders -> success at ${new Date().toLocaleString()} | Completed tasks: 0, Emails: 0`
       );
       return;
     }
@@ -184,7 +184,7 @@ async function sendProductionOvertimeAttendanceReminders() {
         const subject = trilingualSubject(OVERTIME.subjects.attendanceReminder);
         const taskCount = tasks.length;
         const messages = OVERTIME.messages.attendanceCount(taskCount);
-        const overtimeUrl = `${process.env.APP_URL}/production-overtime`;
+        const overtimeUrl = `${process.env.APP_URL}/overtime-orders`;
         const html = createEmailContent(messages, overtimeUrl);
 
         await axios.post(`${process.env.API_URL}/mailer`, {
@@ -199,17 +199,16 @@ async function sendProductionOvertimeAttendanceReminders() {
       }
     }
   } catch (error) {
-    console.error('Error in sendProductionOvertimeAttendanceReminders:', error);
+    console.error('Error in sendOvertimeOrdersAttendanceReminders:', error);
     throw error;
   }
 
   console.log(
-    `sendProductionOvertimeAttendanceReminders -> success at ${new Date().toLocaleString()} | Completed tasks: ${totalCompletedTasks}, Emails: ${emailsSent}, Errors: ${emailErrors}`
+    `sendOvertimeOrdersAttendanceReminders -> success at ${new Date().toLocaleString()} | Completed tasks: ${totalCompletedTasks}, Emails: ${emailsSent}, Errors: ${emailErrors}`
   );
 }
 
 export {
-  sendProductionOvertimeApprovalReminders,
-  sendProductionOvertimeAttendanceReminders,
+  sendOvertimeOrdersApprovalReminders,
+  sendOvertimeOrdersAttendanceReminders,
 };
-

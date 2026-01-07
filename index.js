@@ -54,6 +54,32 @@ function validateEnv() {
 
 validateEnv();
 
+// Run missed backup monitors on startup (handles restart between 07:12-08:00)
+async function runMissedBackupMonitors() {
+  const now = new Date();
+  const hours = now.getHours();
+  const minutes = now.getMinutes();
+  const currentMinutes = hours * 60 + minutes;
+
+  // Backup monitors run 07:00-07:12, summary at 08:00
+  // If starting after 07:12 (432 min) but before 08:00 (480 min), run monitors
+  if (currentMinutes >= 432 && currentMinutes < 480) {
+    console.log('[startup] Running backup monitors (missed due to restart)');
+    try {
+      await executeJobWithStatusTracking('monitorLv1Backup', monitorLv1Backup);
+      await executeJobWithStatusTracking('monitorLv2Backup', monitorLv2Backup);
+      await executeJobWithStatusTracking('monitorSqlLv1Backup', monitorSqlLv1Backup);
+      await executeJobWithStatusTracking('monitorSqlLv2Backup', monitorSqlLv2Backup);
+      await executeJobWithStatusTracking('monitorEOL308Backup', monitorEOL308Backup);
+      console.log('[startup] Backup monitors completed');
+    } catch (error) {
+      console.error('[startup] Backup monitor error:', error.message);
+    }
+  }
+}
+
+runMissedBackupMonitors();
+
 // Deviations tasks
 // -----------------------
 // Schedule sending of pending deviation approval notifications every workday at 03:00

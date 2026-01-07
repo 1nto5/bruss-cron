@@ -37,9 +37,9 @@ function validateEnv() {
 
   // Warn about optional but important vars
   const optional = {
-    LDAP_URL: 'LDAP sync disabled',
+    LDAP: 'LDAP sync disabled',
     R2PLATNIK_SQL_SERVER: 'R2platnik sync disabled',
-    SYNOLOGY_BACKUP_HOST: 'Backup monitoring disabled',
+    SYNOLOGY_IP: 'Backup monitoring disabled',
     CONTROLLINO_API_KEY: 'Temperature monitoring disabled',
   };
 

@@ -24,6 +24,8 @@ import {
   sendOvertimeOrdersApprovalReminders,
   sendOvertimeOrdersAttendanceReminders,
 } from './overtime-orders/send-reminders.js';
+import { sendOvertimeSubmissionBalanceReminders } from './overtime-submissions/send-balance-reminders.js';
+import { sendOvertimeSubmissionMonthEndReport } from './overtime-submissions/send-month-end-report.js';
 import { syncLdapUsers } from './sync/ldap-users.js';
 import { syncR2platnikEmployees } from './sync/r2platnik-employees.js';
 
@@ -140,6 +142,24 @@ cron.schedule('5 9 * * 1-5', async () => {
   await executeJobWithStatusTracking(
     'sendOvertimeOrdersAttendanceReminders',
     sendOvertimeOrdersAttendanceReminders
+  );
+});
+
+// Overtime submissions tasks (collection: overtime_submissions)
+// -------------------------------------------------------------
+// Schedule sending of balance reminders to users (7 days before month end) every workday at 3:20
+cron.schedule('20 3 * * 1-5', async () => {
+  await executeJobWithStatusTracking(
+    'sendOvertimeSubmissionBalanceReminders',
+    sendOvertimeSubmissionBalanceReminders
+  );
+});
+
+// Schedule sending of month-end report to plant managers (last day of month) at 4:00
+cron.schedule('0 4 28-31 * *', async () => {
+  await executeJobWithStatusTracking(
+    'sendOvertimeSubmissionMonthEndReport',
+    sendOvertimeSubmissionMonthEndReport
   );
 });
 

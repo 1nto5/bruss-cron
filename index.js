@@ -28,6 +28,7 @@ import { sendOvertimeSubmissionBalanceReminders } from './overtime-submissions/s
 import { sendOvertimeSubmissionMonthEndReport } from './overtime-submissions/send-month-end-report.js';
 import { syncLdapUsers } from './sync/ldap-users.js';
 import { syncR2platnikEmployees } from './sync/r2platnik-employees.js';
+import { generateDmcheckCsv } from './powerbi/generate-dmcheck-csv.js';
 
 dotenv.config();
 
@@ -259,4 +260,11 @@ cron.schedule('0 * * * *', async () => {
 // Includes all executions since the last summary was sent
 cron.schedule('0 8 * * *', async () => {
   await statusCollector.sendStatusSummary();
+});
+
+// Power BI data generation
+// ------------------------
+// Generate dmcheck CSV at 5:50 AM and 1:50 PM (10 min before Power BI refresh at 6 AM / 2 PM)
+cron.schedule('50 5,13 * * *', async () => {
+  await executeJobWithStatusTracking('generateDmcheckCsv', generateDmcheckCsv);
 });

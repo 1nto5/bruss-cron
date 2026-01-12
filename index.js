@@ -26,6 +26,7 @@ import {
 } from './overtime-orders/send-reminders.js';
 import { sendOvertimeSubmissionBalanceReminders } from './overtime-submissions/send-balance-reminders.js';
 import { sendOvertimeSubmissionMonthEndReport } from './overtime-submissions/send-month-end-report.js';
+import { sendOvertimeSubmissionsApprovalReminders } from './overtime-submissions/send-approval-reminders.js';
 import { syncLdapUsers } from './sync/ldap-users.js';
 import { syncR2platnikEmployees } from './sync/r2platnik-employees.js';
 import { generateDmcheckCsv } from './powerbi/generate-dmcheck-csv.js';
@@ -148,6 +149,13 @@ cron.schedule('5 9 * * 1-5', async () => {
 
 // Overtime submissions tasks (collection: overtime_submissions)
 // -------------------------------------------------------------
+// Schedule sending of approval reminders to supervisors and plant managers every workday at 3:25
+cron.schedule('25 3 * * 1-5', async () => {
+  await executeJobWithStatusTracking(
+    'sendOvertimeSubmissionsApprovalReminders',
+    sendOvertimeSubmissionsApprovalReminders
+  );
+});
 // Schedule sending of balance reminders to users (7 days before month end) every workday at 3:20
 cron.schedule('20 3 * * 1-5', async () => {
   await executeJobWithStatusTracking(

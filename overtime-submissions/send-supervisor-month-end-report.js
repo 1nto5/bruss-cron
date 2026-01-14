@@ -91,7 +91,7 @@ export async function sendSupervisorMonthEndReport() {
     const users = await usersColl.find({ email: { $in: allEmployeeEmails } }).toArray();
     const userMap = new Map(users.map((u) => [u.email, u.displayName]));
 
-    const overtimeUrl = `${process.env.APP_URL}/overtime-submissions`;
+    const overtimeUrl = `${process.env.APP_URL}/overtime-submissions/balances`;
 
     for (const { _id: supervisorEmail, employees } of supervisorBalances) {
       if (!supervisorEmail) continue;

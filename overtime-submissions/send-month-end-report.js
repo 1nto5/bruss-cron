@@ -96,7 +96,7 @@ export async function sendOvertimeSubmissionMonthEndReport() {
       return { success: true, usersWithBalance, emailsSent: 0, emailErrors: 0, warning: 'no plant managers' };
     }
 
-    const overtimeUrl = `${process.env.APP_URL}/overtime-submissions`;
+    const overtimeUrl = `${process.env.APP_URL}/overtime-submissions/balances`;
     const table = buildSummaryTable(usersData);
     const content = `<p>Below is a list of employees with unsettled overtime at month end:</p>${table}<p>You can mark selected entries for payout in the system.</p>`;
 

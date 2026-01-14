@@ -38,7 +38,7 @@ async function sendOvertimeSubmissionsApprovalReminders() {
     pendingForSupervisors = pendingBySupervisor.reduce((sum, s) => sum + s.count, 0);
     pendingForPlantManagers = pendingPlantManagerCount;
 
-    const submissionsUrl = `${process.env.APP_URL}/overtime-submissions`;
+    const submissionsUrl = `${process.env.APP_URL}/overtime-submissions/balances`;
 
     // Send to supervisors
     for (const { _id: supervisorEmail, count } of pendingBySupervisor) {

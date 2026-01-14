@@ -9,11 +9,10 @@ function escapeHtml(str) {
   return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-function isLastDayOfMonth() {
+function isThreeDaysBeforeMonthEnd() {
   const today = new Date();
-  const tomorrow = new Date(today);
-  tomorrow.setDate(today.getDate() + 1);
-  return tomorrow.getDate() === 1;
+  const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+  return today.getDate() === lastDay - 2;
 }
 
 function buildHtml(content, buttonUrl, buttonText) {
@@ -35,14 +34,13 @@ function buildSummaryTable(usersData) {
   return `<table style="border-collapse:collapse;margin:10px 0;"><thead><tr><th style="padding:4px 8px;border:1px solid #ddd;text-align:left;">Employee</th><th style="padding:4px 8px;border:1px solid #ddd;">Hours</th><th style="padding:4px 8px;border:1px solid #ddd;">Entries</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
-export async function sendOvertimeSubmissionMonthEndReport() {
-  if (!isLastDayOfMonth()) {
-    console.log(`sendOvertimeSubmissionMonthEndReport -> skipped (not last day of month)`);
-    return { skipped: true, reason: 'not last day of month' };
+export async function sendSupervisorMonthEndReport() {
+  if (!isThreeDaysBeforeMonthEnd()) {
+    console.log(`sendSupervisorMonthEndReport -> skipped (not 3 days before month end)`);
+    return { skipped: true, reason: 'not 3 days before month end' };
   }
 
-  let usersWithBalance = 0;
-  let plantManagerCount = 0;
+  let supervisorCount = 0;
   let emailsSent = 0;
   let emailErrors = 0;
 
@@ -60,72 +58,79 @@ export async function sendOvertimeSubmissionMonthEndReport() {
       },
       {
         $group: {
-          _id: '$submittedBy',
+          _id: { supervisor: '$supervisor', employee: '$submittedBy' },
           totalHours: { $sum: '$hours' },
           count: { $sum: 1 },
         },
       },
       { $match: { totalHours: { $ne: 0 } } },
-      { $sort: { totalHours: -1 } },
+      {
+        $group: {
+          _id: '$_id.supervisor',
+          employees: {
+            $push: {
+              email: '$_id.employee',
+              hours: '$totalHours',
+              count: '$count',
+            },
+          },
+        },
+      },
+      { $sort: { _id: 1 } },
     ];
 
-    const userBalances = await coll.aggregate(pipeline).toArray();
-    usersWithBalance = userBalances.length;
+    const supervisorBalances = await coll.aggregate(pipeline).toArray();
+    supervisorCount = supervisorBalances.length;
 
-    if (usersWithBalance === 0) {
-      console.log(`sendOvertimeSubmissionMonthEndReport -> success | No users with unsettled overtime`);
-      return { success: true, usersWithBalance: 0, emailsSent: 0, emailErrors: 0 };
+    if (supervisorCount === 0) {
+      console.log(`sendSupervisorMonthEndReport -> success | No supervisors with employees having unsettled overtime`);
+      return { success: true, supervisorCount: 0, emailsSent: 0, emailErrors: 0 };
     }
 
-    const userEmails = userBalances.map((u) => u._id);
-    const users = await usersColl.find({ email: { $in: userEmails } }).toArray();
+    const allEmployeeEmails = supervisorBalances.flatMap((s) => s.employees.map((e) => e.email));
+    const users = await usersColl.find({ email: { $in: allEmployeeEmails } }).toArray();
     const userMap = new Map(users.map((u) => [u.email, u.displayName]));
 
-    const usersData = userBalances.map((u) => ({
-      email: u._id,
-      displayName: userMap.get(u._id) || u._id,
-      hours: u.totalHours,
-      count: u.count,
-    }));
-
-    const plantManagers = await usersColl.find({ roles: { $in: ['plant-manager'] } }).toArray();
-    plantManagerCount = plantManagers.length;
-
-    if (plantManagerCount === 0) {
-      console.log(`sendOvertimeSubmissionMonthEndReport -> warning | No plant managers found`);
-      return { success: true, usersWithBalance, emailsSent: 0, emailErrors: 0, warning: 'no plant managers' };
-    }
-
     const overtimeUrl = `${process.env.APP_URL}/overtime-submissions`;
-    const table = buildSummaryTable(usersData);
-    const content = `<p>Below is a list of employees with unsettled overtime at month end:</p>${table}<p>You can mark selected entries for payout in the system.</p>`;
 
-    for (const manager of plantManagers) {
-      if (!manager.email) continue;
+    for (const { _id: supervisorEmail, employees } of supervisorBalances) {
+      if (!supervisorEmail) continue;
 
       try {
-        const subject = 'Report: unsettled overtime hours - month end';
+        const usersData = employees
+          .map((e) => ({
+            email: e.email,
+            displayName: userMap.get(e.email) || e.email,
+            hours: e.hours,
+            count: e.count,
+          }))
+          .sort((a, b) => b.hours - a.hours);
+
+        const table = buildSummaryTable(usersData);
+        const content = `<p>Below is a list of your employees with unsettled overtime:</p>${table}<p>You can mark selected entries for payout in the system.</p>`;
+
+        const subject = 'Report: unsettled overtime - your employees';
         const html = buildHtml(content, overtimeUrl, 'Go to overtime');
 
         await axios.post(`${process.env.API_URL}/mailer`, {
-          to: manager.email,
+          to: supervisorEmail,
           subject,
           html,
         });
         emailsSent++;
       } catch (error) {
-        console.error(`Error sending month-end report to ${manager.email}:`, error.message);
+        console.error(`Error sending supervisor month-end report to ${supervisorEmail}:`, error.message);
         emailErrors++;
       }
     }
   } catch (error) {
-    console.error('Error in sendOvertimeSubmissionMonthEndReport:', error);
+    console.error('Error in sendSupervisorMonthEndReport:', error);
     throw error;
   }
 
   console.log(
-    `sendOvertimeSubmissionMonthEndReport -> success | Users: ${usersWithBalance}, PMs: ${plantManagerCount}, Emails: ${emailsSent}, Errors: ${emailErrors}`
+    `sendSupervisorMonthEndReport -> success | Supervisors: ${supervisorCount}, Emails: ${emailsSent}, Errors: ${emailErrors}`
   );
 
-  return { success: true, usersWithBalance, plantManagerCount, emailsSent, emailErrors };
+  return { success: true, supervisorCount, emailsSent, emailErrors };
 }

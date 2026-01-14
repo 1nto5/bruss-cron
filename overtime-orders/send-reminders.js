@@ -1,28 +1,18 @@
 import axios from 'axios';
 import dotenv from 'dotenv';
 import { dbc } from '../lib/mongo.js';
-import {
-  OVERTIME,
-  trilingualSubject,
-  trilingualHtml,
-} from '../lib/email-translations.js';
 
 dotenv.config();
 
-// Helper function to create trilingual email content
-function createEmailContent(messages, overtimeUrl) {
-  return trilingualHtml(
-    { PL: `<p>${messages.PL}</p>`, EN: `<p>${messages.EN}</p>`, DE: `<p>${messages.DE}</p>` },
-    overtimeUrl,
-    OVERTIME.buttons.goToOrders
-  );
+function buildHtml(content, buttonUrl, buttonText) {
+  const buttonStyle =
+    'display:inline-block;padding:10px 20px;font-size:16px;color:white;background-color:#007bff;text-decoration:none;border-radius:5px;';
+  const button = buttonUrl
+    ? `<p><a href="${buttonUrl}" style="${buttonStyle}">${buttonText}</a></p>`
+    : '';
+  return `<div style="font-family:Arial,sans-serif;max-width:600px;">${content}${button}</div>`;
 }
 
-/**
- * Sends email notifications about pending overtime orders
- * - Production managers: pending non-logistics orders (awaiting pre-approval)
- * - Plant managers: pending logistics orders + pre_approved orders (awaiting final approval)
- */
 async function sendOvertimeOrdersApprovalReminders() {
   let pendingForPreApproval = 0;
   let pendingForFinalApproval = 0;
@@ -35,12 +25,10 @@ async function sendOvertimeOrdersApprovalReminders() {
     const coll = await dbc('overtime_orders');
     const usersColl = await dbc('users');
 
-    // Query 1: Pending non-logistics → for production-manager (pre-approval)
     const pendingNonLogistics = await coll
       .find({ status: 'pending', department: { $ne: 'logistics' } })
       .toArray();
 
-    // Query 2: Pending logistics + pre_approved → for plant-manager (final approval)
     const pendingLogistics = await coll
       .find({ status: 'pending', department: 'logistics' })
       .toArray();
@@ -51,7 +39,7 @@ async function sendOvertimeOrdersApprovalReminders() {
 
     const overtimeUrl = `${process.env.APP_URL}/overtime-orders`;
 
-    // Send to production managers if there are pending non-logistics orders
+    // Send to production managers (English)
     if (pendingForPreApproval > 0) {
       const productionManagers = await usersColl
         .find({ roles: { $in: ['production-manager'] } })
@@ -62,15 +50,11 @@ async function sendOvertimeOrdersApprovalReminders() {
       for (const manager of productionManagers) {
         if (!manager.email) continue;
 
-        const subject = trilingualSubject(OVERTIME.subjects.pendingPreApproval);
-        const messages = OVERTIME.messages.pendingPreApprovalCount(pendingForPreApproval);
-        const html = createEmailContent(messages, overtimeUrl);
+        const subject = 'Overtime orders awaiting pre-approval';
+        const message = `You have ${pendingForPreApproval} overtime order${pendingForPreApproval === 1 ? '' : 's'} awaiting pre-approval.`;
+        const html = buildHtml(`<p>${message}</p>`, overtimeUrl, 'Go to orders');
 
         try {
-          if (!process.env.API_URL) {
-            throw new Error('API environment variable is not defined');
-          }
-
           await axios.post(`${process.env.API_URL}/mailer`, {
             to: manager.email,
             subject,
@@ -84,7 +68,7 @@ async function sendOvertimeOrdersApprovalReminders() {
       }
     }
 
-    // Send to plant managers if there are pending logistics or pre_approved orders
+    // Send to plant managers (English)
     if (pendingForFinalApproval > 0) {
       const plantManagers = await usersColl
         .find({ roles: { $in: ['plant-manager'] } })
@@ -95,18 +79,13 @@ async function sendOvertimeOrdersApprovalReminders() {
       for (const manager of plantManagers) {
         if (!manager.email) continue;
 
-        const subject = trilingualSubject(OVERTIME.subjects.pendingApproval);
-        const messages = OVERTIME.messages.pendingLogisticsAndPreApprovedCount(
-          pendingLogistics.length,
-          preApprovedOrders.length
-        );
-        const html = createEmailContent(messages, overtimeUrl);
+        const logisticsInfo = pendingLogistics.length > 0 ? ` (${pendingLogistics.length} logistics)` : '';
+        const preApprovedInfo = preApprovedOrders.length > 0 ? ` (${preApprovedOrders.length} pre-approved)` : '';
+        const subject = 'Pending production overtime work orders';
+        const message = `You have ${pendingForFinalApproval} overtime order${pendingForFinalApproval === 1 ? '' : 's'} awaiting approval${logisticsInfo}${preApprovedInfo}.`;
+        const html = buildHtml(`<p>${message}</p>`, overtimeUrl, 'Go to orders');
 
         try {
-          if (!process.env.API_URL) {
-            throw new Error('API environment variable is not defined');
-          }
-
           await axios.post(`${process.env.API_URL}/mailer`, {
             to: manager.email,
             subject,
@@ -132,10 +111,6 @@ async function sendOvertimeOrdersApprovalReminders() {
   );
 }
 
-/**
- * Checks for approved completed overtime orders and sends reminders
- * to responsible employees to add attendance lists
- */
 async function sendOvertimeOrdersAttendanceReminders() {
   let totalCompletedTasks = 0;
   let emailsSent = 0;
@@ -144,7 +119,6 @@ async function sendOvertimeOrdersAttendanceReminders() {
   try {
     const coll = await dbc('overtime_orders');
 
-    // Find approved tasks that are completed but may need attendance list updates
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
     yesterday.setHours(23, 59, 59, 999);
@@ -167,9 +141,7 @@ async function sendOvertimeOrdersAttendanceReminders() {
 
     totalCompletedTasks = completedTasks.length;
 
-    // Group tasks by responsible employee email to avoid duplicate emails
     const tasksByEmployee = new Map();
-
     for (const task of completedTasks) {
       const employeeEmail = task.responsibleEmployee;
       if (!tasksByEmployee.has(employeeEmail)) {
@@ -178,14 +150,18 @@ async function sendOvertimeOrdersAttendanceReminders() {
       tasksByEmployee.get(employeeEmail).push(task);
     }
 
-    // Send reminder to each responsible employee
+    const overtimeUrl = `${process.env.APP_URL}/overtime-orders`;
+
+    // Send to employees (Polish)
     for (const [employeeEmail, tasks] of tasksByEmployee) {
       try {
-        const subject = trilingualSubject(OVERTIME.subjects.attendanceReminder);
         const taskCount = tasks.length;
-        const messages = OVERTIME.messages.attendanceCount(taskCount);
-        const overtimeUrl = `${process.env.APP_URL}/overtime-orders`;
-        const html = createEmailContent(messages, overtimeUrl);
+        const subject = 'Zlecenia wykonania pracy w godzinach nadliczbowych - produkcja - oczekuje na dodanie listy obecności';
+        const message =
+          taskCount === 1
+            ? 'Zlecenie wykonania pracy w godzinach nadliczbowych - produkcja oczekuje na dodanie listy obecności.'
+            : `${taskCount} zleceń wykonania pracy w godzinach nadliczbowych - produkcja oczekuje na dodanie listy obecności.`;
+        const html = buildHtml(`<p>${message}</p>`, overtimeUrl, 'Przejdź do zleceń');
 
         await axios.post(`${process.env.API_URL}/mailer`, {
           to: employeeEmail,

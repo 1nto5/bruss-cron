@@ -1,17 +1,9 @@
 import axios from 'axios';
 import dotenv from 'dotenv';
 import { dbc } from '../lib/mongo.js';
-import {
-  OVERTIME_SUBMISSIONS,
-  trilingualSubject,
-  trilingualHtml,
-} from '../lib/email-translations.js';
 
 dotenv.config();
 
-/**
- * Check if today is within 7 days before the end of the month
- */
 function isWithinLastWeekOfMonth() {
   const today = new Date();
   const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
@@ -19,16 +11,18 @@ function isWithinLastWeekOfMonth() {
   return daysUntilEnd >= 0 && daysUntilEnd <= 6;
 }
 
-/**
- * Sends daily reminders to users with unsettled overtime hours
- * Runs only during the last 7 days of the month
- */
+function buildHtml(content, buttonUrl, buttonText) {
+  const buttonStyle =
+    'display:inline-block;padding:10px 20px;font-size:16px;color:white;background-color:#007bff;text-decoration:none;border-radius:5px;';
+  const button = buttonUrl
+    ? `<p><a href="${buttonUrl}" style="${buttonStyle}">${buttonText}</a></p>`
+    : '';
+  return `<div style="font-family:Arial,sans-serif;max-width:600px;">${content}${button}</div>`;
+}
+
 export async function sendOvertimeSubmissionBalanceReminders() {
-  // Exit early if not in the last week of month
   if (!isWithinLastWeekOfMonth()) {
-    console.log(
-      `sendOvertimeSubmissionBalanceReminders -> skipped (not last week of month)`
-    );
+    console.log(`sendOvertimeSubmissionBalanceReminders -> skipped (not last week of month)`);
     return { skipped: true, reason: 'not last week of month' };
   }
 
@@ -38,10 +32,7 @@ export async function sendOvertimeSubmissionBalanceReminders() {
 
   try {
     const coll = await dbc('overtime_submissions');
-    const usersColl = await dbc('users');
 
-    // Aggregate unclaimed hours per user
-    // Exclude: accounted, cancelled, payment=true, scheduledDayOff set
     const pipeline = [
       {
         $match: {
@@ -58,9 +49,7 @@ export async function sendOvertimeSubmissionBalanceReminders() {
         },
       },
       {
-        $match: {
-          totalHours: { $ne: 0 },
-        },
+        $match: { totalHours: { $ne: 0 } },
       },
     ];
 
@@ -68,31 +57,23 @@ export async function sendOvertimeSubmissionBalanceReminders() {
     usersWithBalance = userBalances.length;
 
     if (usersWithBalance === 0) {
-      console.log(
-        `sendOvertimeSubmissionBalanceReminders -> success | No users with balance`
-      );
+      console.log(`sendOvertimeSubmissionBalanceReminders -> success | No users with balance`);
       return { success: true, usersWithBalance: 0, emailsSent: 0, emailErrors: 0 };
     }
 
     const overtimeUrl = `${process.env.APP_URL}/overtime-submissions`;
 
-    for (const userBalance of userBalances) {
-      const userEmail = userBalance._id;
-      const totalHours = userBalance.totalHours;
-
+    for (const { _id: userEmail, totalHours } of userBalances) {
       if (!userEmail) continue;
 
       try {
-        const subject = trilingualSubject(OVERTIME_SUBMISSIONS.subjects.balanceReminder);
-        const messages = totalHours > 0
-          ? OVERTIME_SUBMISSIONS.messages.balancePositive(totalHours)
-          : OVERTIME_SUBMISSIONS.messages.balanceNegative(totalHours);
+        const subject = 'Przypomnienie: nierozliczone nadgodziny';
+        const message =
+          totalHours > 0
+            ? `Masz ${totalHours}h nadgodzin do odbioru. Rozlicz je przed końcem miesiąca lub zostaną przekazane do wypłaty.`
+            : `Masz ${Math.abs(totalHours)}h do odpracowania. Rozlicz przed końcem miesiąca.`;
 
-        const html = trilingualHtml(
-          { PL: `<p>${messages.PL}</p>`, EN: `<p>${messages.EN}</p>`, DE: `<p>${messages.DE}</p>` },
-          overtimeUrl,
-          OVERTIME_SUBMISSIONS.buttons.goToSubmissions
-        );
+        const html = buildHtml(`<p>${message}</p>`, overtimeUrl, 'Przejdź do nadgodzin');
 
         await axios.post(`${process.env.API_URL}/mailer`, {
           to: userEmail,

@@ -1,28 +1,18 @@
 import axios from 'axios';
 import dotenv from 'dotenv';
 import { dbc } from '../lib/mongo.js';
-import {
-  OVERTIME_SUBMISSIONS,
-  trilingualSubject,
-  trilingualHtml,
-} from '../lib/email-translations.js';
 
 dotenv.config();
 
-// Helper function to create trilingual email content
-function createEmailContent(messages, submissionsUrl) {
-  return trilingualHtml(
-    { PL: `<p>${messages.PL}</p>`, EN: `<p>${messages.EN}</p>`, DE: `<p>${messages.DE}</p>` },
-    submissionsUrl,
-    OVERTIME_SUBMISSIONS.buttons.goToSubmissions
-  );
+function buildHtml(content, buttonUrl, buttonText) {
+  const buttonStyle =
+    'display:inline-block;padding:10px 20px;font-size:16px;color:white;background-color:#007bff;text-decoration:none;border-radius:5px;';
+  const button = buttonUrl
+    ? `<p><a href="${buttonUrl}" style="${buttonStyle}">${buttonText}</a></p>`
+    : '';
+  return `<div style="font-family:Arial,sans-serif;max-width:600px;">${content}${button}</div>`;
 }
 
-/**
- * Sends email notifications about pending overtime submissions
- * - Supervisors: pending submissions assigned to them
- * - Plant managers: pending-plant-manager submissions (awaiting final approval for payment requests)
- */
 async function sendOvertimeSubmissionsApprovalReminders() {
   let pendingForSupervisors = 0;
   let pendingForPlantManagers = 0;
@@ -34,7 +24,6 @@ async function sendOvertimeSubmissionsApprovalReminders() {
     const coll = await dbc('overtime_submissions');
     const usersColl = await dbc('users');
 
-    // Query 1: Pending submissions grouped by supervisor
     const pendingBySupervisor = await coll
       .aggregate([
         { $match: { status: 'pending' } },
@@ -42,7 +31,6 @@ async function sendOvertimeSubmissionsApprovalReminders() {
       ])
       .toArray();
 
-    // Query 2: Pending-plant-manager submissions (awaiting final approval)
     const pendingPlantManagerCount = await coll.countDocuments({
       status: 'pending-plant-manager',
     });
@@ -52,34 +40,28 @@ async function sendOvertimeSubmissionsApprovalReminders() {
 
     const submissionsUrl = `${process.env.APP_URL}/overtime-submissions`;
 
-    // Send to supervisors if there are pending submissions
-    if (pendingBySupervisor.length > 0) {
-      for (const { _id: supervisorEmail, count } of pendingBySupervisor) {
-        if (!supervisorEmail) continue;
+    // Send to supervisors
+    for (const { _id: supervisorEmail, count } of pendingBySupervisor) {
+      if (!supervisorEmail) continue;
 
-        const subject = trilingualSubject(OVERTIME_SUBMISSIONS.subjects.pendingSupervisorApproval);
-        const messages = OVERTIME_SUBMISSIONS.messages.pendingSupervisorCount(count);
-        const html = createEmailContent(messages, submissionsUrl);
+      const subject = 'Overtime submissions awaiting approval';
+      const message = `You have ${count} overtime submission${count === 1 ? '' : 's'} awaiting your approval.`;
+      const html = buildHtml(`<p>${message}</p>`, submissionsUrl, 'Go to overtime');
 
-        try {
-          if (!process.env.API_URL) {
-            throw new Error('API environment variable is not defined');
-          }
-
-          await axios.post(`${process.env.API_URL}/mailer`, {
-            to: supervisorEmail,
-            subject,
-            html,
-          });
-          supervisorEmailsSent++;
-        } catch (error) {
-          console.error(`Error sending email to supervisor ${supervisorEmail}:`, error.message);
-          emailErrors++;
-        }
+      try {
+        await axios.post(`${process.env.API_URL}/mailer`, {
+          to: supervisorEmail,
+          subject,
+          html,
+        });
+        supervisorEmailsSent++;
+      } catch (error) {
+        console.error(`Error sending email to supervisor ${supervisorEmail}:`, error.message);
+        emailErrors++;
       }
     }
 
-    // Send to plant managers if there are pending-plant-manager submissions
+    // Send to plant managers
     if (pendingForPlantManagers > 0) {
       const plantManagers = await usersColl
         .find({ roles: { $in: ['plant-manager'] } })
@@ -88,15 +70,11 @@ async function sendOvertimeSubmissionsApprovalReminders() {
       for (const manager of plantManagers) {
         if (!manager.email) continue;
 
-        const subject = trilingualSubject(OVERTIME_SUBMISSIONS.subjects.pendingPlantManagerApproval);
-        const messages = OVERTIME_SUBMISSIONS.messages.pendingPlantManagerCount(pendingForPlantManagers);
-        const html = createEmailContent(messages, submissionsUrl);
+        const subject = 'Overtime submissions awaiting approval (payout)';
+        const message = `You have ${pendingForPlantManagers} overtime submission${pendingForPlantManagers === 1 ? '' : 's'} (payout) awaiting your approval.`;
+        const html = buildHtml(`<p>${message}</p>`, submissionsUrl, 'Go to overtime');
 
         try {
-          if (!process.env.API_URL) {
-            throw new Error('API environment variable is not defined');
-          }
-
           await axios.post(`${process.env.API_URL}/mailer`, {
             to: manager.email,
             subject,

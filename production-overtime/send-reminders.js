@@ -1,21 +1,16 @@
 import axios from 'axios';
 import dotenv from 'dotenv';
 import { dbc } from '../lib/mongo.js';
-import {
-  OVERTIME,
-  trilingualSubject,
-  trilingualHtml,
-} from '../lib/email-translations.js';
 
 dotenv.config();
 
-// Helper function to create trilingual email content
-function createEmailContent(messages, overtimeUrl) {
-  return trilingualHtml(
-    { PL: `<p>${messages.PL}</p>`, EN: `<p>${messages.EN}</p>`, DE: `<p>${messages.DE}</p>` },
-    overtimeUrl,
-    OVERTIME.buttons.goToOrders
-  );
+function buildHtml(content, buttonUrl, buttonText) {
+  const buttonStyle =
+    'display:inline-block;padding:10px 20px;font-size:16px;color:white;background-color:#007bff;text-decoration:none;border-radius:5px;';
+  const button = buttonUrl
+    ? `<p><a href="${buttonUrl}" style="${buttonStyle}">${buttonText}</a></p>`
+    : '';
+  return `<div style="font-family:Arial,sans-serif;max-width:600px;">${content}${button}</div>`;
 }
 
 /**
@@ -62,9 +57,9 @@ async function sendProductionOvertimeApprovalReminders() {
       for (const manager of productionManagers) {
         if (!manager.email) continue;
 
-        const subject = trilingualSubject(OVERTIME.subjects.pendingPreApproval);
-        const messages = OVERTIME.messages.pendingPreApprovalCount(pendingForPreApproval);
-        const html = createEmailContent(messages, overtimeUrl);
+        const subject = 'Production overtime awaiting pre-approval';
+        const message = `You have ${pendingForPreApproval} production overtime request${pendingForPreApproval === 1 ? '' : 's'} awaiting pre-approval.`;
+        const html = buildHtml(`<p>${message}</p>`, overtimeUrl, 'Go to production overtime');
 
         try {
           if (!process.env.API_URL) {
@@ -95,12 +90,9 @@ async function sendProductionOvertimeApprovalReminders() {
       for (const manager of plantManagers) {
         if (!manager.email) continue;
 
-        const subject = trilingualSubject(OVERTIME.subjects.pendingApproval);
-        const messages = OVERTIME.messages.pendingLogisticsAndPreApprovedCount(
-          pendingLogistics.length,
-          preApprovedOrders.length
-        );
-        const html = createEmailContent(messages, overtimeUrl);
+        const subject = 'Production overtime awaiting approval';
+        const message = `You have ${pendingLogistics.length} logistics request${pendingLogistics.length === 1 ? '' : 's'} and ${preApprovedOrders.length} pre-approved request${preApprovedOrders.length === 1 ? '' : 's'} awaiting final approval.`;
+        const html = buildHtml(`<p>${message}</p>`, overtimeUrl, 'Go to production overtime');
 
         try {
           if (!process.env.API_URL) {
@@ -178,14 +170,15 @@ async function sendProductionOvertimeAttendanceReminders() {
       tasksByEmployee.get(employeeEmail).push(task);
     }
 
+    const overtimeUrl = `${process.env.APP_URL}/production-overtime`;
+
     // Send reminder to each responsible employee
     for (const [employeeEmail, tasks] of tasksByEmployee) {
       try {
-        const subject = trilingualSubject(OVERTIME.subjects.attendanceReminder);
         const taskCount = tasks.length;
-        const messages = OVERTIME.messages.attendanceCount(taskCount);
-        const overtimeUrl = `${process.env.APP_URL}/production-overtime`;
-        const html = createEmailContent(messages, overtimeUrl);
+        const subject = 'Production overtime - attendance list reminder';
+        const message = `You have ${taskCount} completed production overtime task${taskCount === 1 ? '' : 's'} that may need attendance list updates.`;
+        const html = buildHtml(`<p>${message}</p>`, overtimeUrl, 'Go to production overtime');
 
         await axios.post(`${process.env.API_URL}/mailer`, {
           to: employeeEmail,

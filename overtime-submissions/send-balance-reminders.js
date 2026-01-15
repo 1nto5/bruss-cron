@@ -67,11 +67,8 @@ export async function sendOvertimeSubmissionBalanceReminders() {
       if (!userEmail) continue;
 
       try {
-        const subject = 'Przypomnienie: nierozliczone nadgodziny';
-        const message =
-          totalHours > 0
-            ? `Masz ${totalHours}h nadgodzin do odbioru. Rozlicz je przed końcem miesiąca lub zostaną przekazane do wypłaty.`
-            : `Masz ${Math.abs(totalHours)}h do odpracowania. Rozlicz przed końcem miesiąca.`;
+        const subject = 'Przypomnienie: Proszę rozliczyć nadgodziny';
+        const message = `Proszę o rozliczenie zaległych nadgodzin. Aktualny stan: <strong>${totalHours}h</strong>.`;
 
         const html = buildHtml(`<p>${message}</p>`, overtimeUrl, 'Przejdź do nadgodzin');
 

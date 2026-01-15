@@ -27,6 +27,7 @@ import {
 import { sendOvertimeSubmissionBalanceReminders } from './overtime-submissions/send-balance-reminders.js';
 import { sendOvertimeSubmissionMonthEndReport } from './overtime-submissions/send-month-end-report.js';
 import { sendOvertimeSubmissionsApprovalReminders } from './overtime-submissions/send-approval-reminders.js';
+import { sendSupervisorMonthEndReport } from './overtime-submissions/send-supervisor-month-end-report.js';
 import { syncLdapUsers } from './sync/ldap-users.js';
 import { syncR2platnikEmployees } from './sync/r2platnik-employees.js';
 import { generateDmcheckCsv } from './powerbi/generate-dmcheck-csv.js';
@@ -161,6 +162,14 @@ cron.schedule('20 3 * * 1-5', async () => {
   await executeJobWithStatusTracking(
     'sendOvertimeSubmissionBalanceReminders',
     sendOvertimeSubmissionBalanceReminders
+  );
+});
+
+// Schedule sending of supervisor month-end report (3 days before month end) at 4:00
+cron.schedule('0 4 26-29 * *', async () => {
+  await executeJobWithStatusTracking(
+    'sendSupervisorMonthEndReport',
+    sendSupervisorMonthEndReport
   );
 });
 

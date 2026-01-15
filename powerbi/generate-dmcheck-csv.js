@@ -101,7 +101,7 @@ export async function generateDmcheckCsv() {
       const defect = defectKey ? defectsMap.get(defectKey) : null;
 
       const row = [
-        `"${doc.dmc || ''}"`,
+        `="${doc.dmc || ''}"`,  // ="..." forces Power BI to treat as text
         escapeCSV(formatLocalTime(doc.time)),
         escapeCSV(doc.workplace?.toUpperCase()),
         escapeCSV(doc.article),

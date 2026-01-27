@@ -24,6 +24,7 @@ import {
   sendOvertimeOrdersApprovalReminders,
   sendOvertimeOrdersAttendanceReminders,
 } from './overtime-orders/send-reminders.js';
+import { sendIndividualOvertimeOrdersApprovalReminders } from './individual-overtime-orders/send-approval-reminders.js';
 import { sendOvertimeSubmissionBalanceReminders } from './overtime-submissions/send-balance-reminders.js';
 import { sendOvertimeSubmissionMonthEndReport } from './overtime-submissions/send-month-end-report.js';
 import { sendOvertimeSubmissionsApprovalReminders } from './overtime-submissions/send-approval-reminders.js';
@@ -148,9 +149,19 @@ cron.schedule('5 9 * * 1-5', async () => {
   );
 });
 
+// Individual overtime orders tasks (collection: individual_overtime_orders)
+// -------------------------------------------------------------------------
+// Schedule sending of approval reminders to supervisors and plant managers every workday at 3:30
+cron.schedule('30 3 * * 1-5', async () => {
+  await executeJobWithStatusTracking(
+    'sendIndividualOvertimeOrdersApprovalReminders',
+    sendIndividualOvertimeOrdersApprovalReminders
+  );
+});
+
 // Overtime submissions tasks (collection: overtime_submissions)
 // -------------------------------------------------------------
-// Schedule sending of approval reminders to supervisors and plant managers every workday at 3:25
+// Schedule sending of approval reminders to supervisors every workday at 3:25
 cron.schedule('25 3 * * 1-5', async () => {
   await executeJobWithStatusTracking(
     'sendOvertimeSubmissionsApprovalReminders',

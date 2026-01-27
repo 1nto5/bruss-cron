@@ -1,6 +1,7 @@
 import axios from 'axios';
 import dotenv from 'dotenv';
 import { dbc } from '../lib/mongo.js';
+import { buildHtml } from '../lib/email-helper.js';
 
 dotenv.config();
 
@@ -9,19 +10,11 @@ function escapeHtml(str) {
   return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-function isThreeDaysBeforeMonthEnd() {
+function isWithinLastWeekOfMonth() {
   const today = new Date();
-  const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
-  return today.getDate() === lastDay - 2;
-}
-
-function buildHtml(content, buttonUrl, buttonText) {
-  const buttonStyle =
-    'display:inline-block;padding:10px 20px;font-size:16px;color:white;background-color:#007bff;text-decoration:none;border-radius:5px;';
-  const button = buttonUrl
-    ? `<p><a href="${buttonUrl}" style="${buttonStyle}">${buttonText}</a></p>`
-    : '';
-  return `<div style="font-family:Arial,sans-serif;max-width:600px;">${content}${button}</div>`;
+  const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+  const daysUntilEnd = lastDayOfMonth.getDate() - today.getDate();
+  return daysUntilEnd >= 0 && daysUntilEnd <= 6;
 }
 
 function buildSummaryTable(usersData) {
@@ -35,9 +28,9 @@ function buildSummaryTable(usersData) {
 }
 
 export async function sendSupervisorMonthEndReport() {
-  if (!isThreeDaysBeforeMonthEnd()) {
-    console.log(`sendSupervisorMonthEndReport -> skipped (not 3 days before month end)`);
-    return { skipped: true, reason: 'not 3 days before month end' };
+  if (!isWithinLastWeekOfMonth()) {
+    console.log(`sendSupervisorMonthEndReport -> skipped (not within last 7 days of month)`);
+    return { skipped: true, reason: 'not within last 7 days of month' };
   }
 
   let supervisorCount = 0;
@@ -107,7 +100,7 @@ export async function sendSupervisorMonthEndReport() {
           .sort((a, b) => b.hours - a.hours);
 
         const table = buildSummaryTable(usersData);
-        const content = `<p>Below is a list of your employees with unsettled overtime:</p>${table}<p>You can mark selected entries for payout in the system.</p>`;
+        const content = `<p>Below is a list of your employees with unsettled overtime:</p>${table}<p>Please contact these employees about settling their overtime.</p>`;
 
         const subject = 'Report: unsettled overtime - your employees';
         const html = buildHtml(content, overtimeUrl, 'Go to overtime');

@@ -1,17 +1,9 @@
 import axios from 'axios';
 import dotenv from 'dotenv';
 import { dbc } from '../lib/mongo.js';
+import { buildHtml } from '../lib/email-helper.js';
 
 dotenv.config();
-
-function buildHtml(content, buttonUrl, buttonText) {
-  const buttonStyle =
-    'display:inline-block;padding:10px 20px;font-size:16px;color:white;background-color:#007bff;text-decoration:none;border-radius:5px;';
-  const button = buttonUrl
-    ? `<p><a href="${buttonUrl}" style="${buttonStyle}">${buttonText}</a></p>`
-    : '';
-  return `<div style="font-family:Arial,sans-serif;max-width:600px;">${content}${button}</div>`;
-}
 
 async function sendOvertimeOrdersApprovalReminders() {
   let pendingForPreApproval = 0;
@@ -152,16 +144,24 @@ async function sendOvertimeOrdersAttendanceReminders() {
 
     const overtimeUrl = `${process.env.APP_URL}/overtime-orders`;
 
-    // Send to employees (Polish)
+    // Send to employees (bilingual: Polish + English)
     for (const [employeeEmail, tasks] of tasksByEmployee) {
       try {
         const taskCount = tasks.length;
-        const subject = 'Zlecenia wykonania pracy w godzinach nadliczbowych - produkcja - oczekuje na dodanie listy obecności';
-        const message =
+        const subject = 'Zbiorowe zlecenie pracy nadliczbowej oczekuje na dodanie listy obecności / Overtime order awaiting attendance list';
+        const messagePL =
           taskCount === 1
-            ? 'Zlecenie wykonania pracy w godzinach nadliczbowych - produkcja oczekuje na dodanie listy obecności.'
-            : `${taskCount} zleceń wykonania pracy w godzinach nadliczbowych - produkcja oczekuje na dodanie listy obecności.`;
-        const html = buildHtml(`<p>${message}</p>`, overtimeUrl, 'Przejdź do zleceń');
+            ? 'Zbiorowe zlecenie pracy nadliczbowej oczekuje na dodanie listy obecności.'
+            : `${taskCount} zbiorowych zleceń pracy nadliczbowej oczekuje na dodanie listy obecności.`;
+        const messageEN =
+          taskCount === 1
+            ? 'An overtime order is awaiting attendance list submission.'
+            : `${taskCount} overtime orders are awaiting attendance list submission.`;
+        const html = buildHtml(
+          `<p>${messagePL}</p><hr style="border:none;border-top:1px solid #ddd;margin:16px 0;"/><p>${messageEN}</p>`,
+          overtimeUrl,
+          'Przejdź do zleceń / Go to orders'
+        );
 
         await axios.post(`${process.env.API_URL}/mailer`, {
           to: employeeEmail,

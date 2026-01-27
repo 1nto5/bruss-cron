@@ -1,17 +1,9 @@
 import axios from 'axios';
 import dotenv from 'dotenv';
 import { dbc } from '../lib/mongo.js';
+import { buildHtml } from '../lib/email-helper.js';
 
 dotenv.config();
-
-function buildHtml(content, buttonUrl, buttonText) {
-  const buttonStyle =
-    'display:inline-block;padding:10px 20px;font-size:16px;color:white;background-color:#007bff;text-decoration:none;border-radius:5px;';
-  const button = buttonUrl
-    ? `<p><a href="${buttonUrl}" style="${buttonStyle}">${buttonText}</a></p>`
-    : '';
-  return `<div style="font-family:Arial,sans-serif;max-width:600px;">${content}${button}</div>`;
-}
 
 /**
  * Sends email notifications about pending production overtime requests

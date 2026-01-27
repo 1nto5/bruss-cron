@@ -1,6 +1,7 @@
 import axios from 'axios';
 import dotenv from 'dotenv';
 import { dbc } from '../lib/mongo.js';
+import { buildHtml } from '../lib/email-helper.js';
 
 dotenv.config();
 
@@ -9,15 +10,6 @@ function isWithinLastWeekOfMonth() {
   const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
   const daysUntilEnd = lastDayOfMonth.getDate() - today.getDate();
   return daysUntilEnd >= 0 && daysUntilEnd <= 6;
-}
-
-function buildHtml(content, buttonUrl, buttonText) {
-  const buttonStyle =
-    'display:inline-block;padding:10px 20px;font-size:16px;color:white;background-color:#007bff;text-decoration:none;border-radius:5px;';
-  const button = buttonUrl
-    ? `<p><a href="${buttonUrl}" style="${buttonStyle}">${buttonText}</a></p>`
-    : '';
-  return `<div style="font-family:Arial,sans-serif;max-width:600px;">${content}${button}</div>`;
 }
 
 export async function sendOvertimeSubmissionBalanceReminders() {
@@ -67,10 +59,15 @@ export async function sendOvertimeSubmissionBalanceReminders() {
       if (!userEmail) continue;
 
       try {
-        const subject = 'Przypomnienie: Proszę rozliczyć nadgodziny';
-        const message = `Proszę o rozliczenie zaległych nadgodzin. Aktualny stan: <strong>${totalHours}h</strong>.`;
+        const subject = 'Masz nierozliczone nadgodziny / You have unsettled overtime';
+        const messagePL = `Proszę o rozliczenie zaległych nadgodzin. Aktualne saldo: <strong>${totalHours}h</strong>.`;
+        const messageEN = `Please settle your outstanding overtime. Current balance: <strong>${totalHours}h</strong>.`;
 
-        const html = buildHtml(`<p>${message}</p>`, overtimeUrl, 'Przejdź do nadgodzin');
+        const html = buildHtml(
+          `<p>${messagePL}</p><hr style="border:none;border-top:1px solid #ddd;margin:16px 0;"/><p>${messageEN}</p>`,
+          overtimeUrl,
+          'Przejdź do nadgodzin / Go to overtime'
+        );
 
         await axios.post(`${process.env.API_URL}/mailer`, {
           to: userEmail,

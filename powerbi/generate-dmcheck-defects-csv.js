@@ -39,9 +39,13 @@ export async function generateDmcheckDefectsCsv() {
   const startTime = Date.now();
 
   const collConfigs = await dbc("dmcheck_configs");
-  const workplaces = await collConfigs.distinct("workplace", {
-    enableDefectReporting: true,
-  });
+  const workplaces = await collConfigs
+    .aggregate([
+      { $match: { enableDefectReporting: true } },
+      { $group: { _id: "$workplace" } },
+    ])
+    .toArray()
+    .then((docs) => docs.map((d) => d._id));
 
   if (workplaces.length === 0) {
     console.log("generateDmcheckDefectsCsv -> no workplaces with defect reporting enabled, skipping");

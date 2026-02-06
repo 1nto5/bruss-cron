@@ -2,6 +2,7 @@ import axios from 'axios';
 import { dbc } from '../lib/mongo.js';
 import { buildHtml, buildSummaryTable } from '../lib/email-helper.js';
 import { isLastDayOfMonth } from '../lib/date-helpers.js';
+import { extractFullNameFromEmail } from '../lib/name-format.js';
 
 export async function sendOvertimeSubmissionMonthEndReport() {
   if (!isLastDayOfMonth()) {
@@ -45,13 +46,9 @@ export async function sendOvertimeSubmissionMonthEndReport() {
       return { success: true, usersWithBalance: 0, emailsSent: 0, emailErrors: 0 };
     }
 
-    const userEmails = userBalances.map((u) => u._id);
-    const users = await usersColl.find({ email: { $in: userEmails } }).toArray();
-    const userMap = new Map(users.map((u) => [u.email, u.displayName]));
-
     const usersData = userBalances.map((u) => ({
       email: u._id,
-      displayName: userMap.get(u._id) || u._id,
+      displayName: extractFullNameFromEmail(u._id),
       hours: u.totalHours,
       count: u.count,
     }));

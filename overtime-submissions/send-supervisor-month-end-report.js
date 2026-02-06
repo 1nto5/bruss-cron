@@ -2,6 +2,7 @@ import axios from 'axios';
 import { dbc } from '../lib/mongo.js';
 import { buildHtml, buildSummaryTable } from '../lib/email-helper.js';
 import { isWithinLastWeekOfMonth } from '../lib/date-helpers.js';
+import { extractFullNameFromEmail } from '../lib/name-format.js';
 
 export async function sendSupervisorMonthEndReport() {
   if (!isWithinLastWeekOfMonth()) {
@@ -15,7 +16,6 @@ export async function sendSupervisorMonthEndReport() {
 
   try {
     const coll = await dbc('overtime_submissions');
-    const usersColl = await dbc('users');
 
     const pipeline = [
       {
@@ -56,10 +56,6 @@ export async function sendSupervisorMonthEndReport() {
       return { success: true, supervisorCount: 0, emailsSent: 0, emailErrors: 0 };
     }
 
-    const allEmployeeEmails = supervisorBalances.flatMap((s) => s.employees.map((e) => e.email));
-    const users = await usersColl.find({ email: { $in: allEmployeeEmails } }).toArray();
-    const userMap = new Map(users.map((u) => [u.email, u.displayName]));
-
     const overtimeUrl = `${process.env.APP_URL}/overtime-submissions/balances`;
 
     for (const { _id: supervisorEmail, employees } of supervisorBalances) {
@@ -69,7 +65,7 @@ export async function sendSupervisorMonthEndReport() {
         const usersData = employees
           .map((e) => ({
             email: e.email,
-            displayName: userMap.get(e.email) || e.email,
+            displayName: extractFullNameFromEmail(e.email),
             hours: e.hours,
             count: e.count,
           }))

@@ -27,7 +27,7 @@ export async function syncLdapUsers() {
     const options = {
       filter: '(&(mail=*)(c=PL))',
       scope: 'sub',
-      attributes: ['mail', 'dn', 'cn'],
+      attributes: ['mail', 'dn'],
     };
 
     const searchResults = await ldapClient.search(
@@ -51,7 +51,7 @@ export async function syncLdapUsers() {
           updateOne: {
             filter: { email },
             update: {
-              $set: { lastSyncedAt: new Date(), displayName: ldapUser.cn || email },
+              $set: { lastSyncedAt: new Date() },
               $setOnInsert: { email, roles: ['user'] },
             },
             upsert: true,

@@ -1,9 +1,6 @@
 import axios from 'axios';
-import dotenv from 'dotenv';
 import { dbc } from '../lib/mongo.js';
 import { buildHtml } from '../lib/email-helper.js';
-
-dotenv.config();
 
 /**
  * Sends email notifications about pending production overtime requests
@@ -54,10 +51,6 @@ async function sendProductionOvertimeApprovalReminders() {
         const html = buildHtml(`<p>${message}</p>`, overtimeUrl, 'Go to production overtime');
 
         try {
-          if (!process.env.API_URL) {
-            throw new Error('API environment variable is not defined');
-          }
-
           await axios.post(`${process.env.API_URL}/mailer`, {
             to: manager.email,
             subject,
@@ -65,7 +58,7 @@ async function sendProductionOvertimeApprovalReminders() {
           });
           emailsSent++;
         } catch (error) {
-          console.error(`Error sending email to production-manager:`, error);
+          console.error(`Error sending email to production-manager:`, error.message);
           emailErrors++;
         }
       }
@@ -87,10 +80,6 @@ async function sendProductionOvertimeApprovalReminders() {
         const html = buildHtml(`<p>${message}</p>`, overtimeUrl, 'Go to production overtime');
 
         try {
-          if (!process.env.API_URL) {
-            throw new Error('API environment variable is not defined');
-          }
-
           await axios.post(`${process.env.API_URL}/mailer`, {
             to: manager.email,
             subject,
@@ -98,7 +87,7 @@ async function sendProductionOvertimeApprovalReminders() {
           });
           emailsSent++;
         } catch (error) {
-          console.error(`Error sending email to plant-manager:`, error);
+          console.error(`Error sending email to plant-manager:`, error.message);
           emailErrors++;
         }
       }
@@ -179,7 +168,7 @@ async function sendProductionOvertimeAttendanceReminders() {
         });
         emailsSent++;
       } catch (error) {
-        console.error(`Error sending completed task reminder email:`, error);
+        console.error(`Error sending completed task reminder email:`, error.message);
         emailErrors++;
       }
     }

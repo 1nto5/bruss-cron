@@ -1,31 +1,7 @@
 import axios from 'axios';
-import dotenv from 'dotenv';
 import { dbc } from '../lib/mongo.js';
-import { buildHtml } from '../lib/email-helper.js';
-
-dotenv.config();
-
-function escapeHtml(str) {
-  if (!str) return '';
-  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
-
-function isWithinLastWeekOfMonth() {
-  const today = new Date();
-  const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-  const daysUntilEnd = lastDayOfMonth.getDate() - today.getDate();
-  return daysUntilEnd >= 0 && daysUntilEnd <= 6;
-}
-
-function buildSummaryTable(usersData) {
-  const rows = usersData
-    .map(
-      (u) =>
-        `<tr><td style="padding:4px 8px;border:1px solid #ddd;">${escapeHtml(u.displayName || u.email)}</td><td style="padding:4px 8px;border:1px solid #ddd;text-align:right;">${u.hours}h</td><td style="padding:4px 8px;border:1px solid #ddd;text-align:right;">${u.count}</td></tr>`
-    )
-    .join('');
-  return `<table style="border-collapse:collapse;margin:10px 0;"><thead><tr><th style="padding:4px 8px;border:1px solid #ddd;text-align:left;">Employee</th><th style="padding:4px 8px;border:1px solid #ddd;">Hours</th><th style="padding:4px 8px;border:1px solid #ddd;">Entries</th></tr></thead><tbody>${rows}</tbody></table>`;
-}
+import { buildHtml, buildSummaryTable } from '../lib/email-helper.js';
+import { isWithinLastWeekOfMonth } from '../lib/date-helpers.js';
 
 export async function sendSupervisorMonthEndReport() {
   if (!isWithinLastWeekOfMonth()) {

@@ -1,8 +1,4 @@
-import dotenv from 'dotenv';
 import { connectToSynologyWithFailover } from '../lib/smb-helpers.js';
-import { statusCollector } from '../lib/status-collector.js';
-
-dotenv.config();
 
 /**
  * Monitor EOL308 backup executed by Synology bash script
@@ -123,9 +119,6 @@ export async function monitorEOL308Backup() {
       monitorDuration: `${duration}s`,
       synologyIp: connectedIp,
     };
-
-    // Report to status collector
-    statusCollector.addSuccess('monitorEOL308Backup', result);
 
     return result;
   } catch (error) {

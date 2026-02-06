@@ -1,8 +1,4 @@
-import dotenv from 'dotenv';
 import { connectToSynologyWithFailover } from '../lib/smb-helpers.js';
-import { statusCollector } from '../lib/status-collector.js';
-
-dotenv.config();
 
 /**
  * Monitor LV2 MySQL backup executed by Synology mysqldump script
@@ -126,9 +122,6 @@ export async function monitorSqlLv2Backup() {
       database: statusJson.database || 'bmw_l2',
       host: statusJson.host || 'unknown',
     };
-
-    // Report to status collector
-    statusCollector.addSuccess('monitorSqlLv2Backup', result);
 
     return result;
   } catch (error) {

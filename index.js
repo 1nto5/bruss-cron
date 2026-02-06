@@ -93,27 +93,19 @@ runMissedBackupMonitors();
 // Deviations tasks
 // -----------------------
 // Schedule sending of pending deviation approval notifications every workday at 03:00
-cron.schedule(
-  '0 3 * * 1-5',
-  async () => {
-    await executeJobWithStatusTracking(
-      'sendDeviationApprovalReminders',
-      sendDeviationApprovalReminders
-    );
-  },
-  {}
-);
+cron.schedule('0 3 * * 1-5', async () => {
+  await executeJobWithStatusTracking(
+    'sendDeviationApprovalReminders',
+    sendDeviationApprovalReminders
+  );
+});
 // Schedule deviations status update every 2 hours
-cron.schedule(
-  '0 */2 * * *',
-  async () => {
-    await executeJobWithStatusTracking(
-      'deviationsStatusUpdate',
-      deviationsStatusUpdate
-    );
-  },
-  {}
-);
+cron.schedule('0 */2 * * *', async () => {
+  await executeJobWithStatusTracking(
+    'deviationsStatusUpdate',
+    deviationsStatusUpdate
+  );
+});
 
 // Production overtime tasks (collection: production_overtime)
 // -----------------------------------------------------------

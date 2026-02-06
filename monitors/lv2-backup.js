@@ -1,8 +1,4 @@
-import dotenv from 'dotenv';
 import { connectToSynologyWithFailover } from '../lib/smb-helpers.js';
-import { statusCollector } from '../lib/status-collector.js';
-
-dotenv.config();
 
 /**
  * Monitor LV2 Zasoby backup executed by Synology rsync script
@@ -126,9 +122,6 @@ export async function monitorLv2Backup() {
       successfulDirs: statusJson.successfulDirs || 0,
       failedDirs: statusJson.failedDirs || 0,
     };
-
-    // Report to status collector
-    statusCollector.addSuccess('monitorLv2Backup', result);
 
     return result;
   } catch (error) {

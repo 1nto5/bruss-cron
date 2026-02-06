@@ -1,9 +1,6 @@
 import axios from 'axios';
-import dotenv from 'dotenv';
 import { dbc } from '../lib/mongo.js';
 import { buildHtml } from '../lib/email-helper.js';
-
-dotenv.config();
 
 async function sendOvertimeOrdersApprovalReminders() {
   let pendingForPreApproval = 0;
@@ -54,7 +51,7 @@ async function sendOvertimeOrdersApprovalReminders() {
           });
           emailsSent++;
         } catch (error) {
-          console.error(`Error sending email to production-manager:`, error);
+          console.error(`Error sending email to production-manager:`, error.message);
           emailErrors++;
         }
       }
@@ -85,7 +82,7 @@ async function sendOvertimeOrdersApprovalReminders() {
           });
           emailsSent++;
         } catch (error) {
-          console.error(`Error sending email to plant-manager:`, error);
+          console.error(`Error sending email to plant-manager:`, error.message);
           emailErrors++;
         }
       }
@@ -170,7 +167,7 @@ async function sendOvertimeOrdersAttendanceReminders() {
         });
         emailsSent++;
       } catch (error) {
-        console.error(`Error sending completed task reminder email:`, error);
+        console.error(`Error sending completed task reminder email:`, error.message);
         emailErrors++;
       }
     }

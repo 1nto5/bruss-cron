@@ -1,9 +1,6 @@
 import axios from 'axios';
-import dotenv from 'dotenv';
 import { dbc } from '../lib/mongo.js';
 import { buildHtml } from '../lib/email-helper.js';
-
-dotenv.config();
 
 async function sendIndividualOvertimeOrdersApprovalReminders() {
   let pendingForPlantManagers = 0;

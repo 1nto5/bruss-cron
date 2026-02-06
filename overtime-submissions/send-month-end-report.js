@@ -1,39 +1,7 @@
 import axios from 'axios';
-import dotenv from 'dotenv';
 import { dbc } from '../lib/mongo.js';
-
-dotenv.config();
-
-function escapeHtml(str) {
-  if (!str) return '';
-  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
-
-function isLastDayOfMonth() {
-  const today = new Date();
-  const tomorrow = new Date(today);
-  tomorrow.setDate(today.getDate() + 1);
-  return tomorrow.getDate() === 1;
-}
-
-function buildHtml(content, buttonUrl, buttonText) {
-  const buttonStyle =
-    'display:inline-block;padding:10px 20px;font-size:16px;color:white;background-color:#007bff;text-decoration:none;border-radius:5px;';
-  const button = buttonUrl
-    ? `<p><a href="${buttonUrl}" style="${buttonStyle}">${buttonText}</a></p>`
-    : '';
-  return `<div style="font-family:Arial,sans-serif;max-width:600px;">${content}${button}</div>`;
-}
-
-function buildSummaryTable(usersData) {
-  const rows = usersData
-    .map(
-      (u) =>
-        `<tr><td style="padding:4px 8px;border:1px solid #ddd;">${escapeHtml(u.displayName || u.email)}</td><td style="padding:4px 8px;border:1px solid #ddd;text-align:right;">${u.hours}h</td><td style="padding:4px 8px;border:1px solid #ddd;text-align:right;">${u.count}</td></tr>`
-    )
-    .join('');
-  return `<table style="border-collapse:collapse;margin:10px 0;"><thead><tr><th style="padding:4px 8px;border:1px solid #ddd;text-align:left;">Employee</th><th style="padding:4px 8px;border:1px solid #ddd;">Hours</th><th style="padding:4px 8px;border:1px solid #ddd;">Entries</th></tr></thead><tbody>${rows}</tbody></table>`;
-}
+import { buildHtml, buildSummaryTable } from '../lib/email-helper.js';
+import { isLastDayOfMonth } from '../lib/date-helpers.js';
 
 export async function sendOvertimeSubmissionMonthEndReport() {
   if (!isLastDayOfMonth()) {

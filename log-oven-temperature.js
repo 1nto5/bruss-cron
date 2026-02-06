@@ -1,4 +1,3 @@
-import dotenv from 'dotenv';
 import { dbc } from './lib/mongo.js';
 import {
   SENSOR_OUTLIER_THRESHOLD,
@@ -11,8 +10,6 @@ import {
 } from './lib/temperature-constants.js';
 import { temperatureOutlierCollector } from './lib/temperature-outlier-collector.js';
 import { temperatureMissingSensorCollector } from './lib/temperature-missing-sensor-collector.js';
-
-dotenv.config();
 
 // Ensure the API key is set in the environment
 const API_KEY = process.env.CONTROLLINO_API_KEY;

@@ -1,10 +1,7 @@
 import axios from 'axios';
-import dotenv from 'dotenv';
 import fs from 'fs/promises';
 import path from 'path';
 import { parseEmailAddresses } from '../lib/email-helper.js';
-
-dotenv.config();
 
 // Track last known file sizes and last notified sizes per file
 const fileState = new Map();

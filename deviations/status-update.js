@@ -1,7 +1,4 @@
-import dotenv from 'dotenv';
 import { dbc } from '../lib/mongo.js';
-
-dotenv.config();
 
 function stripTime(date) {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate());

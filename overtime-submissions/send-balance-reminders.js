@@ -1,16 +1,7 @@
 import axios from 'axios';
-import dotenv from 'dotenv';
 import { dbc } from '../lib/mongo.js';
 import { buildHtml } from '../lib/email-helper.js';
-
-dotenv.config();
-
-function isWithinLastWeekOfMonth() {
-  const today = new Date();
-  const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-  const daysUntilEnd = lastDayOfMonth.getDate() - today.getDate();
-  return daysUntilEnd >= 0 && daysUntilEnd <= 6;
-}
+import { isWithinLastWeekOfMonth } from '../lib/date-helpers.js';
 
 export async function sendOvertimeSubmissionBalanceReminders() {
   if (!isWithinLastWeekOfMonth()) {

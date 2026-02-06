@@ -1,9 +1,7 @@
 import axios from 'axios';
-import dotenv from 'dotenv';
 import fs from 'fs';
 import XLSX from 'xlsx';
-
-dotenv.config();
+import { buildHtml, escapeHtml } from '../lib/email-helper.js';
 
 const HR_TRAINING_CONFIG = {
   excelFilePath: process.env.HR_TRAINING_EXCEL_FILE_PATH || 'C:\\cron-temp-files\\hr-trainings.xlsx',
@@ -14,11 +12,6 @@ const HR_TRAINING_CONFIG = {
   sheetName: process.env.HR_TRAINING_SHEET_NAME || null,
   evaluationResultColumn: process.env.HR_TRAINING_EVALUATION_RESULT_COLUMN || 'AC',
 };
-
-function escapeHtml(str) {
-  if (!str) return '';
-  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
 
 function removePlPolishCharacters(text) {
   const polishToLatin = {
@@ -38,10 +31,6 @@ function convertNameToEmail(fullName) {
   const surname = removePlPolishCharacters(nameParts[0]).toLowerCase();
   const firstname = removePlPolishCharacters(nameParts[1]).toLowerCase();
   return `${firstname}.${surname}@bruss-group.com`;
-}
-
-function buildHtml(content) {
-  return `<div style="font-family:Arial,sans-serif;max-width:600px;">${content}</div>`;
 }
 
 function getTodaysDate() {

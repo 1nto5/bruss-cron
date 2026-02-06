@@ -1,14 +1,6 @@
 import axios from 'axios';
-import dotenv from 'dotenv';
 import { dbc } from '../lib/mongo.js';
-import { buildHtml } from '../lib/email-helper.js';
-
-dotenv.config();
-
-function escapeHtml(str) {
-  if (!str) return '';
-  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
+import { buildHtml, escapeHtml } from '../lib/email-helper.js';
 
 const ROLE_NAMES = {
   'group-leader': { pl: 'Group Leader', en: 'Group Leader' },
@@ -193,7 +185,4 @@ async function sendDeviationApprovalReminders() {
   );
 }
 
-export {
-  sendDeviationApprovalReminders,
-  sendDeviationApprovalReminders as sendPendingDeviationApprovalNotifications,
-};
+export { sendDeviationApprovalReminders };

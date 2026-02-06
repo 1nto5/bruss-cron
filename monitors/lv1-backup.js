@@ -1,8 +1,4 @@
-import dotenv from 'dotenv';
 import { connectToSynologyWithFailover } from '../lib/smb-helpers.js';
-import { statusCollector } from '../lib/status-collector.js';
-
-dotenv.config();
 
 /**
  * Monitor LV1 MVC_Pictures backup executed by Synology rsync script
@@ -124,9 +120,6 @@ export async function monitorLv1Backup() {
       formattedSize: statusJson.totalSize || '0 B',
       totalBytes: 0, // Would need parsing from totalSize string
     };
-
-    // Report to status collector
-    statusCollector.addSuccess('monitorLv1Backup', result);
 
     return result;
   } catch (error) {

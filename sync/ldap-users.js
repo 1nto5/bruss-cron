@@ -13,21 +13,30 @@ export async function syncLdapUsers() {
   let addedUsers = 0;
   let deletedUsers = 0;
   let processedUsers = 0;
+  let usersCollection = null;
 
   try {
     // Bind to LDAP server
     await ldapClient.bind(process.env.LDAP_DN, process.env.LDAP_PASS);
 
-    const usersCollection = await dbc('users');
+    usersCollection = await dbc('users');
 
     // Keep track of active LDAP users for cleanup later
     const activeEmails = new Set();
 
-    // Single search with PL filter
+    // Single search with PL filter - expanded attributes for organizational data
     const options = {
       filter: '(&(mail=*)(c=PL))',
       scope: 'sub',
-      attributes: ['mail', 'dn', 'cn'],
+      attributes: [
+        'mail',
+        'dn',
+        'cn',
+        'title', // Job title
+        'department', // Department
+        'manager', // Supervisor DN
+        'memberOf', // AD groups
+      ],
     };
 
     const searchResults = await ldapClient.search(
@@ -36,6 +45,17 @@ export async function syncLdapUsers() {
     );
 
     processedUsers = searchResults.length;
+
+    // Build DN → email map for manager resolution
+    const dnToEmail = new Map();
+    for (const ldapUser of searchResults) {
+      if (ldapUser.dn && ldapUser.mail) {
+        const email = Array.isArray(ldapUser.mail)
+          ? ldapUser.mail[0].toLowerCase()
+          : ldapUser.mail.toLowerCase();
+        dnToEmail.set(ldapUser.dn.toLowerCase(), email);
+      }
+    }
 
     // Process search results - collect bulk operations
     const bulkOps = [];
@@ -47,11 +67,28 @@ export async function syncLdapUsers() {
 
         activeEmails.add(email);
 
+        // Resolve manager DN to email
+        let managerEmail = null;
+        if (ldapUser.manager) {
+          const managerDn = ldapUser.manager.toLowerCase();
+          managerEmail = dnToEmail.get(managerDn) || null;
+        }
+
         bulkOps.push({
           updateOne: {
             filter: { email },
             update: {
-              $set: { lastSyncedAt: new Date(), displayName: ldapUser.cn || email },
+              $set: {
+                lastSyncedAt: new Date(),
+                displayName: ldapUser.cn || email,
+                // Organizational data from LDAP
+                dn: ldapUser.dn || null,
+                jobTitle: ldapUser.title || null,
+                department: ldapUser.department || null,
+                managerDn: ldapUser.manager || null,
+                managerEmail,
+                adGroups: ldapUser.memberOf || [],
+              },
               $setOnInsert: { email, roles: ['user'] },
             },
             upsert: true,
@@ -95,6 +132,23 @@ export async function syncLdapUsers() {
         );
       }
     }
+    // Log unresolved managers for review
+    if (usersCollection) {
+      try {
+        const unresolvedManagers = await usersCollection.countDocuments({
+          managerDn: { $ne: null },
+          managerEmail: null,
+        });
+        if (unresolvedManagers > 0) {
+          console.warn(
+            `⚠️ ${unresolvedManagers} users have unresolved manager DNs`
+          );
+        }
+      } catch {
+        // Ignore count errors in finally block
+      }
+    }
+
     console.log(
       `syncLdapUsers -> success at ${new Date().toLocaleString()} | Processed: ${processedUsers}, Added: ${addedUsers}, Deleted: ${deletedUsers}`
     );

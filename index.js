@@ -296,3 +296,4 @@ cron.schedule('0 8 * * *', async () => {
 cron.schedule('50 5,13 * * *', async () => {
   await executeJobWithStatusTracking('generateDmcheckCsv', generateDmcheckCsv);
 });
+

@@ -31,7 +31,7 @@ import { sendOvertimeSubmissionsApprovalReminders } from './overtime-submissions
 import { sendSupervisorMonthEndReport } from './overtime-submissions/send-supervisor-month-end-report.js';
 import { syncLdapUsers } from './sync/ldap-users.js';
 import { syncR2platnikEmployees } from './sync/r2platnik-employees.js';
-import { generateDmcheckCsv } from './powerbi/generate-dmcheck-csv.js';
+import { generateDmcheckDefectsCsv } from './powerbi/generate-dmcheck-defects-csv.js';
 
 dotenv.config();
 
@@ -284,7 +284,7 @@ cron.schedule('0 8 * * *', async () => {
 
 // Power BI data generation
 // ------------------------
-// Generate dmcheck CSV at 5:50 AM and 1:50 PM (10 min before Power BI refresh at 6 AM / 2 PM)
+// Generate dmcheck defects CSV at 5:50 AM and 1:50 PM (10 min before Power BI refresh at 6 AM / 2 PM)
 cron.schedule('50 5,13 * * *', async () => {
-  await executeJobWithStatusTracking('generateDmcheckCsv', generateDmcheckCsv);
+  await executeJobWithStatusTracking('generateDmcheckDefectsCsv', generateDmcheckDefectsCsv);
 });

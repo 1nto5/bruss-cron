@@ -35,27 +35,22 @@ function escapeCSV(value) {
   return str;
 }
 
-export async function generateDmcheckCsv() {
+export async function generateDmcheckDefectsCsv() {
   const startTime = Date.now();
+
+  const collConfigs = await dbc("dmcheck_configs");
+  const workplaces = await collConfigs.distinct("workplace", {
+    enableDefectReporting: true,
+  });
+
+  if (workplaces.length === 0) {
+    console.log("generateDmcheckDefectsCsv -> no workplaces with defect reporting enabled, skipping");
+    return null;
+  }
 
   const query = {
     time: { $gte: DEFECT_REPORTING_START },
-    workplace: {
-      $in: [
-        "eol810",
-        "eol405",
-        "eol488",
-        "eol45",
-        "fw1",
-        "fw2",
-        "fw3",
-        "fw4",
-        "fw5",
-        "fw6",
-        "fw7",
-        "fw8",
-      ],
-    },
+    workplace: { $in: workplaces },
   };
 
   const archiveThreshold = new Date(
@@ -129,7 +124,7 @@ export async function generateDmcheckCsv() {
   const duration = ((Date.now() - startTime) / 1000).toFixed(1);
 
   console.log(
-    `generateDmcheckCsv -> success | Rows: ${lines.length}, Size: ${(stats.size / 1024 / 1024).toFixed(1)}MB, Time: ${duration}s`,
+    `generateDmcheckDefectsCsv -> success | Rows: ${lines.length}, Size: ${(stats.size / 1024 / 1024).toFixed(1)}MB, Time: ${duration}s`,
   );
 
   return {

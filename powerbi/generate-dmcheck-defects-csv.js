@@ -1,9 +1,7 @@
-import { dbc } from "../lib/mongo.js";
+import { createWriteStream } from "fs";
 import fs from "fs/promises";
 import path from "path";
-
-const DEFECT_REPORTING_START = new Date("2025-11-01T00:00:00.000Z");
-const ARCHIVE_DAYS = 90;
+import { dbc } from "../lib/mongo.js";
 
 // Output path - configurable via env, defaults to data directory
 const OUTPUT_PATH =
@@ -35,6 +33,46 @@ function escapeCSV(value) {
   return str;
 }
 
+/**
+ * Streams a MongoDB cursor to a write stream as CSV rows.
+ * Uses backpressure handling to avoid buffering too much in memory.
+ * @returns {Promise<number>} Number of rows written.
+ */
+async function processCursor(cursor, defectsMap, writeStream) {
+  let rowCount = 0;
+
+  for await (const doc of cursor) {
+    const defectKeysList = doc.defectKeys?.length ? doc.defectKeys : [null];
+
+    for (const defectKey of defectKeysList) {
+      const defect = defectKey ? defectsMap.get(defectKey) : null;
+
+      const row = [
+        `="${doc.dmc || ""}"`, // ="..." forces Power BI to treat as text
+        escapeCSV(formatLocalTime(doc.time)),
+        escapeCSV(doc.workplace?.toUpperCase()),
+        escapeCSV(doc.article),
+        escapeCSV(formatOperators(doc.operator)),
+        escapeCSV(doc.status),
+        escapeCSV(defectKey),
+        escapeCSV(defect?.translations?.pl),
+        escapeCSV(defect?.translations?.de),
+        escapeCSV(defect?.translations?.en),
+      ].join(",");
+
+      const canContinue = writeStream.write(row + "\n");
+      rowCount++;
+
+      // Backpressure: if the internal buffer is full, wait for it to drain
+      if (!canContinue) {
+        await new Promise((resolve) => writeStream.once("drain", resolve));
+      }
+    }
+  }
+
+  return rowCount;
+}
+
 export async function generateDmcheckDefectsCsv() {
   const startTime = Date.now();
 
@@ -52,15 +90,18 @@ export async function generateDmcheckDefectsCsv() {
     return null;
   }
 
-  const query = {
-    time: { $gte: DEFECT_REPORTING_START },
-    workplace: { $in: workplaces },
-  };
+  const query = { workplace: { $in: workplaces } };
 
-  const archiveThreshold = new Date(
-    Date.now() - ARCHIVE_DAYS * 24 * 60 * 60 * 1000,
-  );
-  const skipArchive = DEFECT_REPORTING_START >= archiveThreshold;
+  const projection = {
+    _id: 0,
+    dmc: 1,
+    time: 1,
+    workplace: 1,
+    article: 1,
+    operator: 1,
+    status: 1,
+    defectKeys: 1,
+  };
 
   const collScans = await dbc("dmcheck_scans");
   const collDefects = await dbc("dmcheck_defects");
@@ -68,18 +109,12 @@ export async function generateDmcheckDefectsCsv() {
   const defects = await collDefects.find().toArray();
   const defectsMap = new Map(defects.map((d) => [d.key, d]));
 
-  let scans = await collScans.find(query).sort({ _id: -1 }).toArray();
+  // Ensure directory exists before opening the write stream
+  await fs.mkdir(path.dirname(OUTPUT_PATH), { recursive: true });
 
-  if (!skipArchive) {
-    const collScansArchive = await dbc("dmcheck_scans_archive");
-    const scansArchive = await collScansArchive
-      .find(query)
-      .sort({ _id: -1 })
-      .toArray();
-    scans = [...scans, ...scansArchive];
-  }
+  const writeStream = createWriteStream(OUTPUT_PATH, { encoding: "utf-8" });
 
-  // Build CSV
+  // Write CSV header
   const headers = [
     "dmc",
     "time",
@@ -92,47 +127,30 @@ export async function generateDmcheckDefectsCsv() {
     "defect_de",
     "defect_en",
   ];
-  const lines = [headers.join(",")];
+  writeStream.write(headers.join(",") + "\n");
 
-  scans.forEach((doc) => {
-    const defectKeysList = doc.defectKeys?.length ? doc.defectKeys : [null];
+  // Stream live scans
+  const liveCursor = collScans
+    .find(query, { projection })
+    .sort({ time: -1 });
+  const rowCount = await processCursor(liveCursor, defectsMap, writeStream);
 
-    defectKeysList.forEach((defectKey) => {
-      const defect = defectKey ? defectsMap.get(defectKey) : null;
-
-      const row = [
-        `="${doc.dmc || ""}"`, // ="..." forces Power BI to treat as text
-        escapeCSV(formatLocalTime(doc.time)),
-        escapeCSV(doc.workplace?.toUpperCase()),
-        escapeCSV(doc.article),
-        escapeCSV(formatOperators(doc.operator)),
-        escapeCSV(doc.status),
-        escapeCSV(defectKey),
-        escapeCSV(defect?.translations?.pl),
-        escapeCSV(defect?.translations?.de),
-        escapeCSV(defect?.translations?.en),
-      ];
-      lines.push(row.join(","));
-    });
+  // Close the stream and wait for it to finish flushing
+  await new Promise((resolve, reject) => {
+    writeStream.on("finish", resolve);
+    writeStream.on("error", reject);
+    writeStream.end();
   });
-
-  const csv = lines.join("\n");
-
-  // Ensure directory exists
-  await fs.mkdir(path.dirname(OUTPUT_PATH), { recursive: true });
-
-  // Write CSV file
-  await fs.writeFile(OUTPUT_PATH, csv, "utf-8");
 
   const stats = await fs.stat(OUTPUT_PATH);
   const duration = ((Date.now() - startTime) / 1000).toFixed(1);
 
   console.log(
-    `generateDmcheckDefectsCsv -> success | Rows: ${lines.length}, Size: ${(stats.size / 1024 / 1024).toFixed(1)}MB, Time: ${duration}s`,
+    `generateDmcheckDefectsCsv -> success | Rows: ${rowCount}, Size: ${(stats.size / 1024 / 1024).toFixed(1)}MB, Time: ${duration}s`,
   );
 
   return {
-    rowCount: lines.length,
+    rowCount,
     fileSize: stats.size,
     filePath: OUTPUT_PATH,
     duration: parseFloat(duration),

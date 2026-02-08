@@ -11,11 +11,7 @@ import {
 import { temperatureOutlierCollector } from './lib/temperature-outlier-collector.js';
 import { temperatureMissingSensorCollector } from './lib/temperature-missing-sensor-collector.js';
 
-// Ensure the API key is set in the environment
 const API_KEY = process.env.CONTROLLINO_API_KEY;
-if (!API_KEY) {
-  throw new Error('CONTROLLINO_API_KEY environment variable is not set');
-}
 
 // Helper to get all oven configs (oven name to IP mapping)
 async function getOvenConfigs() {
@@ -194,6 +190,9 @@ function logError(...args) {
 
 // Main function
 async function logOvenTemperature() {
+  if (!API_KEY) {
+    throw new Error('CONTROLLINO_API_KEY environment variable is not set');
+  }
   try {
     const ovenMap = await getOvenConfigs();
     const activeProcesses = await getActiveOvenProcesses();

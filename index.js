@@ -39,7 +39,10 @@ import { generateDmcheckDefectsCsv } from './powerbi/generate-dmcheck-defects-cs
 
 // Validate required environment variables at startup
 function validateEnv() {
-  const required = ['MONGO_URI', 'API_URL', 'ADMIN_EMAIL', 'APP_URL'];
+  const required = ['MONGO_URI'];
+  if (isFeatureEnabled('email-notifications')) {
+    required.push('API_URL', 'ADMIN_EMAIL', 'APP_URL');
+  }
   const missing = required.filter((key) => !process.env[key]);
 
   if (missing.length > 0) {
@@ -67,7 +70,7 @@ function validateEnv() {
 validateEnv();
 
 // Log plant configuration
-const features = ['dmcheck', 'oven', 'deviations', 'overtime', 'hr-training', 'sync', 'backup-monitors'];
+const features = ['dmcheck', 'dmcheck-archive', 'oven', 'deviations', 'overtime', 'hr-training', 'sync', 'ldap-sync', 'backup-monitors', 'email-notifications'];
 console.log(`[plant] Plant: ${plant}`);
 features.forEach((f) => {
   console.log(`[plant]   ${f}: ${isFeatureEnabled(f) ? 'enabled' : 'disabled'}`);
@@ -211,6 +214,7 @@ if (isFeatureEnabled('hr-training')) {
 
 // Data synchronization tasks
 // --------------------------
+// R2Platnik sync — only with full 'sync' feature
 if (isFeatureEnabled('sync')) {
   // Schedule synchronization of r2platnik employees at 16:00 every workday
   cron.schedule('0 16 * * 1-5', async () => {
@@ -219,20 +223,26 @@ if (isFeatureEnabled('sync')) {
       syncR2platnikEmployees
     );
   });
+}
+
+// LDAP sync — enabled by 'sync' (full) or 'ldap-sync' (LDAP only)
+if (isFeatureEnabled('sync') || isFeatureEnabled('ldap-sync')) {
   // Schedule synchronization of LDAP users every workday at 16:10
   cron.schedule('10 16 * * 1-5', async () => {
     await executeJobWithStatusTracking('syncLdapUsers', syncLdapUsers);
   });
 }
 
-// Infrastructure — always runs regardless of plant
+// Infrastructure — email-dependent monitoring
 // -------------------------------------------------
 
-// PM2 Error Log Monitoring
-// Monitor PM2 error logs every 15 minutes
-cron.schedule('*/15 * * * *', async () => {
-  await executeJobWithStatusTracking('monitorPm2ErrorLogs', monitorPm2ErrorLogs);
-});
+if (isFeatureEnabled('email-notifications')) {
+  // PM2 Error Log Monitoring
+  // Monitor PM2 error logs every 15 minutes
+  cron.schedule('*/15 * * * *', async () => {
+    await executeJobWithStatusTracking('monitorPm2ErrorLogs', monitorPm2ErrorLogs);
+  });
+}
 
 // Backup Monitoring tasks
 // -----------------------
@@ -268,12 +278,16 @@ if (isFeatureEnabled('backup-monitors')) {
 
 // DMCheck tasks
 // -------------
-if (isFeatureEnabled('dmcheck')) {
+// Archive scans — enabled by 'dmcheck' (full) or 'dmcheck-archive' (archive only)
+if (isFeatureEnabled('dmcheck') || isFeatureEnabled('dmcheck-archive')) {
   // Schedule archiving of scans every Sunday at 22:00
   cron.schedule('0 22 * * 0', async () => {
     await executeJobWithStatusTracking('archiveScans', archiveScans);
   });
+}
 
+// Power BI CSV generation — only with full 'dmcheck' feature
+if (isFeatureEnabled('dmcheck')) {
   // Generate dmcheck defects CSV at 5:50 AM and 1:50 PM (10 min before Power BI refresh at 6 AM / 2 PM)
   cron.schedule('50 5,13 * * *', async () => {
     await executeJobWithStatusTracking('generateDmcheckDefectsCsv', generateDmcheckDefectsCsv);
@@ -299,18 +313,19 @@ if (isFeatureEnabled('oven')) {
   });
 }
 
-// Error reporting — always runs regardless of plant
-// Schedule batch error notification every hour at minute 0
-cron.schedule('0 * * * *', async () => {
-  await errorCollector.sendBatchNotification();
-});
+// Error & status reporting — requires email-notifications feature
+if (isFeatureEnabled('email-notifications')) {
+  // Schedule batch error notification every hour at minute 0
+  cron.schedule('0 * * * *', async () => {
+    await errorCollector.sendBatchNotification();
+  });
 
-// Status reporting — always runs regardless of plant
-// Schedule daily status summary at 8:00 AM every day
-// Includes all executions since the last summary was sent
-cron.schedule('0 8 * * *', async () => {
-  await statusCollector.sendStatusSummary();
-});
+  // Schedule daily status summary at 8:00 AM every day
+  // Includes all executions since the last summary was sent
+  cron.schedule('0 8 * * *', async () => {
+    await statusCollector.sendStatusSummary();
+  });
+}
 
 // Graceful shutdown
 async function shutdown(signal) {

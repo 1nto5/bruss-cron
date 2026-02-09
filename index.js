@@ -21,10 +21,6 @@ import { monitorPm2ErrorLogs } from './monitors/pm2-error-logs.js';
 import { monitorSqlLv1Backup } from './monitors/sql-lv1-backup.js';
 import { monitorSqlLv2Backup } from './monitors/sql-lv2-backup.js';
 import {
-  sendProductionOvertimeApprovalReminders,
-  sendProductionOvertimeAttendanceReminders,
-} from './production-overtime/send-reminders.js';
-import {
   sendOvertimeOrdersApprovalReminders,
   sendOvertimeOrdersAttendanceReminders,
 } from './overtime-orders/send-reminders.js';
@@ -123,25 +119,9 @@ if (isFeatureEnabled('deviations')) {
   });
 }
 
-// Overtime tasks (production-overtime, overtime-orders, individual-overtime-orders, overtime-submissions)
+// Overtime tasks (overtime-orders, individual-overtime-orders, overtime-submissions)
 // ------------------------------------------------------------------------------------------------------
 if (isFeatureEnabled('overtime')) {
-  // Production overtime tasks (collection: production_overtime)
-  // Schedule sending of pending production overtime email notifications every workday at 3:05
-  cron.schedule('5 3 * * 1-5', async () => {
-    await executeJobWithStatusTracking(
-      'sendProductionOvertimeApprovalReminders',
-      sendProductionOvertimeApprovalReminders
-    );
-  });
-  // Schedule sending of completed task attendance reminders every workday at 9:00
-  cron.schedule('0 9 * * 1-5', async () => {
-    await executeJobWithStatusTracking(
-      'sendProductionOvertimeAttendanceReminders',
-      sendProductionOvertimeAttendanceReminders
-    );
-  });
-
   // Overtime orders tasks (collection: overtime_orders)
   // Schedule sending of pending overtime orders email notifications every workday at 3:15
   cron.schedule('15 3 * * 1-5', async () => {

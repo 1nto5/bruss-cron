@@ -2,6 +2,7 @@ import axios from 'axios';
 import fs from 'fs/promises';
 import path from 'path';
 import { parseEmailAddresses } from '../lib/email-helper.js';
+import { toWarsawTime } from '../lib/format-helpers.js';
 
 // Track last known file sizes and last notified sizes per file
 const fileState = new Map();
@@ -114,9 +115,7 @@ async function sendErrorNotification(appName, errorLines) {
     return;
   }
 
-  const timestamp = new Date().toLocaleString('pl-PL', {
-    timeZone: 'Europe/Warsaw',
-  });
+  const timestamp = toWarsawTime();
 
   const subject = `[CRON PM2 ERROR] ${appName} - ${timestamp}`;
 
@@ -250,8 +249,6 @@ export async function monitorPm2ErrorLogs() {
   return {
     checked: logFiles.length,
     results,
-    timestamp: new Date().toLocaleString('pl-PL', {
-      timeZone: 'Europe/Warsaw',
-    }),
+    timestamp: toWarsawTime(),
   };
 }

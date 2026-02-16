@@ -10,6 +10,7 @@ import {
 } from './lib/temperature-constants.js';
 import { temperatureOutlierCollector } from './lib/temperature-outlier-collector.js';
 import { temperatureMissingSensorCollector } from './lib/temperature-missing-sensor-collector.js';
+import { hoursAgo } from './lib/format-helpers.js';
 
 const API_KEY = process.env.CONTROLLINO_API_KEY;
 
@@ -173,19 +174,29 @@ async function saveTemperatureLog(oven, processIds, sensorData, timestamp = new 
   return analysis;
 }
 
-// Logging helpers to control output by environment
-function logInfo(...args) {
-  if (process.env.NODE_ENV === 'development') {
-    console.log(...args);
-  }
+// Logging helpers — dev-only for info/warn, always-on for errors
+function createLogger(method, devOnly = true) {
+  if (devOnly && process.env.NODE_ENV !== 'development') return () => {};
+  return (...args) => console[method](...args);
 }
-function logWarn(...args) {
-  if (process.env.NODE_ENV === 'development') {
-    console.warn(...args);
-  }
-}
-function logError(...args) {
-  console.error(...args);
+const logInfo = createLogger('log');
+const logWarn = createLogger('warn');
+const logError = createLogger('error', false);
+
+// Determine whether a connection error for an oven should be reported.
+// Suppresses notifications when all processes are only 'prepared', when no recent
+// running process exists, or when the last successful read is within the silence window.
+async function shouldReportConnectionError(oven, processes) {
+  if (processes.every(proc => proc.status === 'prepared')) return null;
+
+  const hasRecentRunningProcess = processes.some(proc =>
+    proc.status === 'running' && (!proc.startTime || new Date(proc.startTime) > hoursAgo(1))
+  );
+  if (!hasRecentRunningProcess) return null;
+
+  const lastReadTime = await getLastSuccessfulReadTime(oven);
+  const shouldNotify = !lastReadTime || lastReadTime < hoursAgo(SILENCE_DURATION_HOURS);
+  return shouldNotify ? { lastReadTime } : null;
 }
 
 // Main function
@@ -215,19 +226,7 @@ async function logOvenTemperature() {
         logWarn(`No IP configured for oven: ${oven}`);
         continue;
       }
-      
-      // Check if all processes for this oven are in 'prepared' status
-      const hasOnlyPreparedProcesses = processes.every(proc => proc.status === 'prepared');
-      
-      // Check if any process has been running for less than 1 hour
-      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
-      const hasRecentRunningProcess = processes.some(proc => {
-        // Process is considered recent if:
-        // 1. It's in 'running' status AND
-        // 2. Either has no startTime OR startTime is within last hour
-        return proc.status === 'running' && (!proc.startTime || new Date(proc.startTime) > oneHourAgo);
-      });
-      
+
       try {
         const sensorData = await fetchSensorData(ip);
         const processIds = processes.map((proc) => proc._id);
@@ -246,59 +245,51 @@ async function logOvenTemperature() {
           logInfo(`Outliers detected for oven ${oven}: ${analysis.outlierSensors.join(', ')}`);
         }
       } catch (err) {
-        // Only log error if:
-        // 1. Not all processes are in 'prepared' status AND
-        // 2. At least one process has been running for less than 1 hour AND
-        // 3. At least 2 hours have passed since the last successful reading
-        if (!hasOnlyPreparedProcesses && hasRecentRunningProcess) {
-          const lastReadTime = await getLastSuccessfulReadTime(oven);
-          const silenceThreshold = new Date(Date.now() - SILENCE_DURATION_HOURS * 60 * 60 * 1000);
-          const shouldNotify = !lastReadTime || lastReadTime < silenceThreshold;
-          
-          if (shouldNotify) {
-            const currentTimestamp = new Date();
-            const errorContext = {
-              oven,
-              ip,
-              processIds: processes.map(p => p._id),
-              processStatuses: processes.map(p => ({ 
-                id: p._id, 
-                status: p.status, 
-                hydraBatch: p.hydraBatch,
-                startTime: p.startTime 
-              })),
-              lastSuccessfulRead: lastReadTime,
-              errorType: err.name,
-              errorCode: err.code
-            };
-            logError(
-              `Failed to fetch/log data for oven ${oven} (${ip}):`,
-              err.message,
-              '\nContext:', JSON.stringify(errorContext, null, 2)
-            );
-            
-            // Collect missing sensor for hourly batch notification
-            temperatureMissingSensorCollector.addMissingSensor(
-              oven,
-              ip,
-              processes.map(p => ({
-                id: p._id,
-                status: p.status,
-                hydraBatch: p.hydraBatch,
-                article: p.article,
-                startTime: p.startTime
-              })),
-              lastReadTime,
-              err,
-              currentTimestamp
-            );
-            
-            // Add context to error for better notification
-            err.context = errorContext;
-            throw err;
-          }
+        const report = await shouldReportConnectionError(oven, processes);
+        if (report) {
+          const { lastReadTime } = report;
+          const currentTimestamp = new Date();
+          const errorContext = {
+            oven,
+            ip,
+            processIds: processes.map(p => p._id),
+            processStatuses: processes.map(p => ({
+              id: p._id,
+              status: p.status,
+              hydraBatch: p.hydraBatch,
+              startTime: p.startTime
+            })),
+            lastSuccessfulRead: lastReadTime,
+            errorType: err.name,
+            errorCode: err.code
+          };
+          logError(
+            `Failed to fetch/log data for oven ${oven} (${ip}):`,
+            err.message,
+            '\nContext:', JSON.stringify(errorContext, null, 2)
+          );
+
+          // Collect missing sensor for hourly batch notification
+          temperatureMissingSensorCollector.addMissingSensor(
+            oven,
+            ip,
+            processes.map(p => ({
+              id: p._id,
+              status: p.status,
+              hydraBatch: p.hydraBatch,
+              article: p.article,
+              startTime: p.startTime
+            })),
+            lastReadTime,
+            err,
+            currentTimestamp
+          );
+
+          // Add context to error for better notification
+          err.context = errorContext;
+          throw err;
         }
-        // Silently continue if all running processes are older than 1 hour or last read was within 2 hours
+        // Silently continue if error reporting is suppressed
       }
     }
   } catch (err) {

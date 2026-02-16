@@ -100,211 +100,65 @@ async function runMissedBackupMonitors() {
 
 runMissedBackupMonitors();
 
-// Deviations tasks
-// -----------------------
-if (isFeatureEnabled('deviations')) {
-  // Schedule sending of pending deviation approval notifications every workday at 03:00
-  cron.schedule('0 3 * * 1-5', async () => {
-    await executeJobWithStatusTracking(
-      'sendDeviationApprovalReminders',
-      sendDeviationApprovalReminders
-    );
-  });
-  // Schedule deviations status update every 2 hours
-  cron.schedule('0 */2 * * *', async () => {
-    await executeJobWithStatusTracking(
-      'deviationsStatusUpdate',
-      deviationsStatusUpdate
-    );
-  });
+// Job registry — declarative schedule for all simple executeJobWithStatusTracking jobs
+const jobRegistry = [
+  // Deviations
+  { feature: 'deviations',          schedule: '0 3 * * 1-5',    name: 'sendDeviationApprovalReminders',              fn: sendDeviationApprovalReminders },
+  { feature: 'deviations',          schedule: '0 */2 * * *',    name: 'deviationsStatusUpdate',                      fn: deviationsStatusUpdate },
+  // Overtime orders
+  { feature: 'overtime',            schedule: '15 3 * * 1-5',   name: 'sendOvertimeOrdersApprovalReminders',         fn: sendOvertimeOrdersApprovalReminders },
+  { feature: 'overtime',            schedule: '5 9 * * 1-5',    name: 'sendOvertimeOrdersAttendanceReminders',       fn: sendOvertimeOrdersAttendanceReminders },
+  { feature: 'overtime',            schedule: '30 3 * * 1-5',   name: 'sendIndividualOvertimeOrdersApprovalReminders', fn: sendIndividualOvertimeOrdersApprovalReminders },
+  // Overtime submissions
+  { feature: 'overtime',            schedule: '25 3 * * 1-5',   name: 'sendOvertimeSubmissionsApprovalReminders',    fn: sendOvertimeSubmissionsApprovalReminders },
+  { feature: 'overtime',            schedule: '20 3 * * 1-5',   name: 'sendOvertimeSubmissionBalanceReminders',      fn: sendOvertimeSubmissionBalanceReminders },
+  { feature: 'overtime',            schedule: '0 4 26-29 * *',  name: 'sendSupervisorMonthEndReport',                fn: sendSupervisorMonthEndReport },
+  { feature: 'overtime',            schedule: '0 4 28-31 * *',  name: 'sendOvertimeSubmissionMonthEndReport',        fn: sendOvertimeSubmissionMonthEndReport },
+  // HR training
+  { feature: 'hr-training',         schedule: '10 3 * * 1-5',   name: 'sendHrTrainingEvaluationNotifications',       fn: sendHrTrainingEvaluationNotifications },
+  // Sync
+  { feature: 'sync',                schedule: '0 16 * * 1-5',   name: 'syncR2platnikEmployees',                      fn: syncR2platnikEmployees },
+  // Monitoring
+  { feature: 'email-notifications', schedule: '*/15 * * * *',   name: 'monitorPm2ErrorLogs',                         fn: monitorPm2ErrorLogs },
+  // Backup monitors
+  { feature: 'backup-monitors',     schedule: '0 7 * * *',      name: 'monitorLv1Backup',                            fn: monitorLv1Backup },
+  { feature: 'backup-monitors',     schedule: '3 7 * * *',      name: 'monitorLv2Backup',                            fn: monitorLv2Backup },
+  { feature: 'backup-monitors',     schedule: '6 7 * * *',      name: 'monitorSqlLv1Backup',                         fn: monitorSqlLv1Backup },
+  { feature: 'backup-monitors',     schedule: '9 7 * * *',      name: 'monitorSqlLv2Backup',                         fn: monitorSqlLv2Backup },
+  { feature: 'backup-monitors',     schedule: '12 7 * * *',     name: 'monitorEOL308Backup',                         fn: monitorEOL308Backup },
+  // DMCheck
+  { feature: 'dmcheck',             schedule: '50 5,13 * * *',  name: 'generateDmcheckDefectsCsv',                   fn: generateDmcheckDefectsCsv },
+  // Oven
+  { feature: 'oven',                schedule: '* * * * *',       name: 'logOvenTemperature',                          fn: logOvenTemperature },
+];
+
+for (const job of jobRegistry) {
+  if (isFeatureEnabled(job.feature)) {
+    cron.schedule(job.schedule, () => executeJobWithStatusTracking(job.name, job.fn));
+  }
 }
 
-// Overtime tasks (overtime-orders, individual-overtime-orders, overtime-submissions)
-// ------------------------------------------------------------------------------------------------------
-if (isFeatureEnabled('overtime')) {
-  // Overtime orders tasks (collection: overtime_orders)
-  // Schedule sending of pending overtime orders email notifications every workday at 3:15
-  cron.schedule('15 3 * * 1-5', async () => {
-    await executeJobWithStatusTracking(
-      'sendOvertimeOrdersApprovalReminders',
-      sendOvertimeOrdersApprovalReminders
-    );
-  });
-  // Schedule sending of completed overtime orders attendance reminders every workday at 9:05
-  cron.schedule('5 9 * * 1-5', async () => {
-    await executeJobWithStatusTracking(
-      'sendOvertimeOrdersAttendanceReminders',
-      sendOvertimeOrdersAttendanceReminders
-    );
-  });
-
-  // Individual overtime orders tasks (collection: individual_overtime_orders)
-  // Schedule sending of approval reminders to supervisors and plant managers every workday at 3:30
-  cron.schedule('30 3 * * 1-5', async () => {
-    await executeJobWithStatusTracking(
-      'sendIndividualOvertimeOrdersApprovalReminders',
-      sendIndividualOvertimeOrdersApprovalReminders
-    );
-  });
-
-  // Overtime submissions tasks (collection: overtime_submissions)
-  // Schedule sending of approval reminders to supervisors every workday at 3:25
-  cron.schedule('25 3 * * 1-5', async () => {
-    await executeJobWithStatusTracking(
-      'sendOvertimeSubmissionsApprovalReminders',
-      sendOvertimeSubmissionsApprovalReminders
-    );
-  });
-  // Schedule sending of balance reminders to users (7 days before month end) every workday at 3:20
-  cron.schedule('20 3 * * 1-5', async () => {
-    await executeJobWithStatusTracking(
-      'sendOvertimeSubmissionBalanceReminders',
-      sendOvertimeSubmissionBalanceReminders
-    );
-  });
-
-  // Schedule sending of supervisor month-end report (3 days before month end) at 4:00
-  cron.schedule('0 4 26-29 * *', async () => {
-    await executeJobWithStatusTracking(
-      'sendSupervisorMonthEndReport',
-      sendSupervisorMonthEndReport
-    );
-  });
-
-  // Schedule sending of month-end report to plant managers (last day of month) at 4:00
-  cron.schedule('0 4 28-31 * *', async () => {
-    await executeJobWithStatusTracking(
-      'sendOvertimeSubmissionMonthEndReport',
-      sendOvertimeSubmissionMonthEndReport
-    );
-  });
-}
-
-// HR Training Evaluation Notifications
-// ------------------------------------
-if (isFeatureEnabled('hr-training')) {
-  // Schedule HR training evaluation deadline notifications every workday at 3:10
-  cron.schedule('10 3 * * 1-5', async () => {
-    await executeJobWithStatusTracking(
-      'sendHrTrainingEvaluationNotifications',
-      sendHrTrainingEvaluationNotifications
-    );
-  });
-}
-
-// Data synchronization tasks
-// --------------------------
-// R2Platnik sync — only with full 'sync' feature
-if (isFeatureEnabled('sync')) {
-  // Schedule synchronization of r2platnik employees at 16:00 every workday
-  cron.schedule('0 16 * * 1-5', async () => {
-    await executeJobWithStatusTracking(
-      'syncR2platnikEmployees',
-      syncR2platnikEmployees
-    );
-  });
-}
+// Jobs with compound feature gates or non-standard patterns (kept inline)
 
 // LDAP sync — enabled by 'sync' (full) or 'ldap-sync' (LDAP only)
 if (isFeatureEnabled('sync') || isFeatureEnabled('ldap-sync')) {
-  // Schedule synchronization of LDAP users every workday at 16:10
-  cron.schedule('10 16 * * 1-5', async () => {
-    await executeJobWithStatusTracking('syncLdapUsers', syncLdapUsers);
-  });
+  cron.schedule('10 16 * * 1-5', () => executeJobWithStatusTracking('syncLdapUsers', syncLdapUsers));
 }
 
-// Infrastructure — email-dependent monitoring
-// -------------------------------------------------
-
-if (isFeatureEnabled('email-notifications')) {
-  // PM2 Error Log Monitoring
-  // Monitor PM2 error logs every 15 minutes
-  cron.schedule('*/15 * * * *', async () => {
-    await executeJobWithStatusTracking('monitorPm2ErrorLogs', monitorPm2ErrorLogs);
-  });
-}
-
-// Backup Monitoring tasks
-// -----------------------
-if (isFeatureEnabled('backup-monitors')) {
-  // Monitor LV1 MVC_Pictures backup daily at 07:00 (before daily summary at 08:00)
-  cron.schedule('0 7 * * *', async () => {
-    await executeJobWithStatusTracking('monitorLv1Backup', monitorLv1Backup);
-  });
-
-  // Monitor LV2 Zasoby backup daily at 07:03
-  cron.schedule('3 7 * * *', async () => {
-    await executeJobWithStatusTracking('monitorLv2Backup', monitorLv2Backup);
-  });
-
-  // Monitor LV1 SQL backup daily at 07:06
-  cron.schedule('6 7 * * *', async () => {
-    await executeJobWithStatusTracking('monitorSqlLv1Backup', monitorSqlLv1Backup);
-  });
-
-  // Monitor LV2 SQL backup daily at 07:09
-  cron.schedule('9 7 * * *', async () => {
-    await executeJobWithStatusTracking('monitorSqlLv2Backup', monitorSqlLv2Backup);
-  });
-
-  // Monitor EOL308 backup daily at 07:12
-  cron.schedule('12 7 * * *', async () => {
-    await executeJobWithStatusTracking(
-      'monitorEOL308Backup',
-      monitorEOL308Backup
-    );
-  });
-}
-
-// DMCheck tasks
-// -------------
 // Archive scans — enabled by 'dmcheck' (full) or 'dmcheck-archive' (archive only)
 if (isFeatureEnabled('dmcheck') || isFeatureEnabled('dmcheck-archive')) {
-  // Schedule archiving of scans every Sunday at 22:00
-  cron.schedule('0 22 * * 0', async () => {
-    await executeJobWithStatusTracking('archiveScans', archiveScans);
-  });
+  cron.schedule('0 22 * * 0', () => executeJobWithStatusTracking('archiveScans', archiveScans));
 }
 
-// Power BI CSV generation — only with full 'dmcheck' feature
-if (isFeatureEnabled('dmcheck')) {
-  // Generate dmcheck defects CSV at 5:50 AM and 1:50 PM (10 min before Power BI refresh at 6 AM / 2 PM)
-  cron.schedule('50 5,13 * * *', async () => {
-    await executeJobWithStatusTracking('generateDmcheckDefectsCsv', generateDmcheckDefectsCsv);
-  });
-}
-
-// Oven tasks
-// ----------
+// Collector batch notifications (method calls, not standalone functions)
 if (isFeatureEnabled('oven')) {
-  // Schedule logging of oven sensors every 1 minute
-  cron.schedule('* * * * *', async () => {
-    await executeJobWithStatusTracking('logOvenTemperature', logOvenTemperature);
-  });
-
-  // Schedule batch temperature outlier notification daily at 9:00 AM
-  cron.schedule('0 9 * * *', async () => {
-    await temperatureOutlierCollector.sendBatchNotification();
-  });
-
-  // Schedule batch missing sensor notification every hour at minute 0
-  cron.schedule('0 * * * *', async () => {
-    await temperatureMissingSensorCollector.sendBatchNotification();
-  });
+  cron.schedule('0 9 * * *', () => temperatureOutlierCollector.sendBatchNotification());
+  cron.schedule('0 * * * *', () => temperatureMissingSensorCollector.sendBatchNotification());
 }
 
-// Error & status reporting — requires email-notifications feature
 if (isFeatureEnabled('email-notifications')) {
-  // Schedule batch error notification every hour at minute 0
-  cron.schedule('0 * * * *', async () => {
-    await errorCollector.sendBatchNotification();
-  });
-
-  // Schedule daily status summary at 8:00 AM every day
-  // Includes all executions since the last summary was sent
-  cron.schedule('0 8 * * *', async () => {
-    await statusCollector.sendStatusSummary();
-  });
+  cron.schedule('0 * * * *', () => errorCollector.sendBatchNotification());
+  cron.schedule('0 8 * * *', () => statusCollector.sendStatusSummary());
 }
 
 // Graceful shutdown

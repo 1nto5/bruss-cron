@@ -2,6 +2,7 @@ import axios from 'axios';
 import fs from 'fs';
 import XLSX from 'xlsx';
 import { buildHtml, escapeHtml } from '../lib/email-helper.js';
+import { toWarsawTime } from '../lib/format-helpers.js';
 
 const HR_TRAINING_CONFIG = {
   excelFilePath: process.env.HR_TRAINING_EXCEL_FILE_PATH || 'C:\\cron-temp-files\\hr-trainings.xlsx',
@@ -224,7 +225,7 @@ export async function sendHrTrainingEvaluationNotifications() {
       <p><strong>Inne błędy powiadomień:</strong> ${errors.length}</p>
       ${errors.length > 0 ? `<ul>${errors.map((e) => `<li>${e.email}: ${e.error}</li>`).join('')}</ul>` : ''}
       <p>Czas trwania: ${duration}s</p>
-      <p>Uruchomienie skryptu: ${startTime.toLocaleString('pl-PL')} - ${endTime.toLocaleString('pl-PL')}</p>
+      <p>Uruchomienie skryptu: ${toWarsawTime(startTime)} - ${toWarsawTime(endTime)}</p>
     `;
     await sendHrErrorOrSummaryEmail('Podsumowanie powiadomień o ocenie szkoleń HR', summaryHtml);
   } catch (error) {

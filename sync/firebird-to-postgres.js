@@ -70,39 +70,6 @@ function fbDetach(db) {
 }
 
 /**
- * Resolve a node-firebird TEXT BLOB (returned as a callback function) to a string.
- * Times out after 5 seconds to avoid hanging on large/corrupt BLOBs.
- */
-function resolveTextBlob(blobFn) {
-  return new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => resolve(null), 5000);
-    blobFn((err, name, event) => {
-      if (err) { clearTimeout(timeout); return resolve(null); }
-      const chunks = [];
-      event.on('data', (chunk) => chunks.push(chunk));
-      event.on('end', () => {
-        clearTimeout(timeout);
-        resolve(Buffer.concat(chunks).toString('utf-8'));
-      });
-      event.on('error', () => { clearTimeout(timeout); resolve(null); });
-    });
-  });
-}
-
-/**
- * Resolve TEXT BLOB values in a row. Binary BLOBs (BYTEA) are skipped entirely.
- */
-async function resolveRowTextBlobs(row, textBlobCols) {
-  for (const col of textBlobCols) {
-    const val = row[col.name];
-    if (typeof val === 'function') {
-      row[col.name] = await resolveTextBlob(val);
-    }
-  }
-  return row;
-}
-
-/**
  * Get list of user tables from Firebird (excludes system tables).
  */
 async function getFirebirdTables(db) {
@@ -145,6 +112,7 @@ async function getFirebirdColumns(db, tableName) {
       r.FIELD_SCALE || 0,
       r.FIELD_SUB_TYPE
     ),
+    isBlob: r.FIELD_TYPE === 261,
   }));
 }
 
@@ -174,8 +142,9 @@ async function syncTable(fbDb, pgPool, tableName) {
       return { table: tableName, rowCount: 0, status: 'skipped', durationMs: Date.now() - startTime };
     }
 
-    // 2. Filter out BYTEA columns (binary BLOBs are useless for Excel)
-    const syncColumns = columns.filter((c) => c.pgType !== 'BYTEA');
+    // 2. Filter out all BLOB columns (type 261 — both binary and text BLOBs)
+    // Regular text columns (VARCHAR, CHAR) are kept. BLOBs cause hangs on large tables.
+    const syncColumns = columns.filter((c) => !c.isBlob);
     if (syncColumns.length === 0) {
       return { table: tableName, rowCount: 0, status: 'skipped', durationMs: Date.now() - startTime };
     }
@@ -194,15 +163,7 @@ async function syncTable(fbDb, pgPool, tableName) {
       return { table: tableName, rowCount: 0, status: 'ok', durationMs: Date.now() - startTime };
     }
 
-    // 6. Resolve TEXT BLOB values (node-firebird returns them as callback functions)
-    const textBlobCols = syncColumns.filter((c) => c.pgType === 'TEXT');
-    if (textBlobCols.length > 0) {
-      for (const row of rows) {
-        await resolveRowTextBlobs(row, textBlobCols);
-      }
-    }
-
-    // 7. Batch insert into PostgreSQL (dynamic batch size based on column count)
+    // 6. Batch insert into PostgreSQL (dynamic batch size based on column count)
     const batchSize = Math.min(MAX_BATCH_SIZE, Math.floor(MAX_PG_PARAMS / syncColumns.length));
     const colNames = syncColumns.map((c) => `"${c.name}"`).join(', ');
     let inserted = 0;

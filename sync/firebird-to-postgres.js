@@ -2,7 +2,8 @@ import Firebird from 'node-firebird';
 import { getPool, closeAllPools } from '../lib/postgres.js';
 import { mapFirebirdTypeToPg } from './firebird-type-map.js';
 
-const BATCH_SIZE = 1000;
+const MAX_BATCH_SIZE = 1000;
+const MAX_PG_PARAMS = 50000; // stay well under PostgreSQL's 65535 limit
 
 // Firebird database configs, read from env at runtime
 function getFirebirdConfigs() {
@@ -66,6 +67,40 @@ function fbDetach(db) {
       else resolve();
     });
   });
+}
+
+/**
+ * Resolve a node-firebird BLOB value (returned as a callback function) to a Buffer or string.
+ */
+function resolveBlob(blobFn) {
+  return new Promise((resolve, reject) => {
+    blobFn((err, name, event) => {
+      if (err) return reject(err);
+      const chunks = [];
+      event.on('data', (chunk) => chunks.push(chunk));
+      event.on('end', () => resolve(Buffer.concat(chunks)));
+      event.on('error', reject);
+    });
+  });
+}
+
+/**
+ * Resolve all BLOB values in a row to actual data.
+ * node-firebird returns BLOB fields as functions — we must read them before inserting into PG.
+ */
+async function resolveRowBlobs(row, columns) {
+  for (const col of columns) {
+    const val = row[col.name];
+    if (typeof val === 'function') {
+      try {
+        const buf = await resolveBlob(val);
+        row[col.name] = col.pgType === 'TEXT' ? buf.toString('utf-8') : buf;
+      } catch {
+        row[col.name] = null;
+      }
+    }
+  }
+  return row;
 }
 
 /**
@@ -153,12 +188,21 @@ async function syncTable(fbDb, pgPool, tableName) {
       return { table: tableName, rowCount: 0, status: 'ok', durationMs: Date.now() - startTime };
     }
 
-    // 5. Batch insert into PostgreSQL
+    // 5. Resolve BLOB values (node-firebird returns them as callback functions)
+    const hasBlobCols = columns.some((c) => c.pgType === 'TEXT' || c.pgType === 'BYTEA');
+    if (hasBlobCols) {
+      for (const row of rows) {
+        await resolveRowBlobs(row, columns);
+      }
+    }
+
+    // 6. Batch insert into PostgreSQL (dynamic batch size based on column count)
+    const batchSize = Math.min(MAX_BATCH_SIZE, Math.floor(MAX_PG_PARAMS / columns.length));
     const colNames = columns.map((c) => `"${c.name}"`).join(', ');
     let inserted = 0;
 
-    for (let i = 0; i < rows.length; i += BATCH_SIZE) {
-      const batch = rows.slice(i, i + BATCH_SIZE);
+    for (let i = 0; i < rows.length; i += batchSize) {
+      const batch = rows.slice(i, i + batchSize);
       const values = [];
       const placeholders = [];
 

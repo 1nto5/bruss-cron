@@ -32,6 +32,8 @@ import { sendSupervisorMonthEndReport } from './overtime-submissions/send-superv
 import { syncLdapUsers } from './sync/ldap-users.js';
 import { syncR2platnikEmployees } from './sync/r2platnik-employees.js';
 import { generateDmcheckDefectsCsv } from './powerbi/generate-dmcheck-defects-csv.js';
+import { syncFirebirdToPostgres } from './sync/firebird-to-postgres.js';
+import { closeAllPools } from './lib/postgres.js';
 
 // Validate required environment variables at startup
 function validateEnv() {
@@ -66,7 +68,7 @@ function validateEnv() {
 validateEnv();
 
 // Log plant configuration
-const features = ['dmcheck', 'dmcheck-archive', 'oven', 'deviations', 'overtime', 'hr-training', 'sync', 'ldap-sync', 'backup-monitors', 'email-notifications'];
+const features = ['dmcheck', 'dmcheck-archive', 'oven', 'deviations', 'overtime', 'hr-training', 'sync', 'ldap-sync', 'backup-monitors', 'email-notifications', 'cmms-sync'];
 console.log(`[plant] Plant: ${plant}`);
 features.forEach((f) => {
   console.log(`[plant]   ${f}: ${isFeatureEnabled(f) ? 'enabled' : 'disabled'}`);
@@ -128,6 +130,8 @@ const jobRegistry = [
   { feature: 'backup-monitors',     schedule: '12 7 * * *',     name: 'monitorEOL308Backup',                         fn: monitorEOL308Backup },
   // DMCheck
   { feature: 'dmcheck',             schedule: '50 5,13 * * *',  name: 'generateDmcheckDefectsCsv',                   fn: generateDmcheckDefectsCsv },
+  // Firebird → PostgreSQL sync
+  { feature: 'cmms-sync',           schedule: '0 2 * * *',      name: 'syncFirebirdToPostgres',                      fn: syncFirebirdToPostgres },
   // Oven
   { feature: 'oven',                schedule: '* * * * *',       name: 'logOvenTemperature',                          fn: logOvenTemperature },
 ];
@@ -174,6 +178,12 @@ async function shutdown(signal) {
     console.log('[shutdown] MongoDB connection closed');
   } catch (err) {
     console.error('[shutdown] Error closing MongoDB:', err.message);
+  }
+  try {
+    await closeAllPools();
+    console.log('[shutdown] PostgreSQL pools closed');
+  } catch (err) {
+    console.error('[shutdown] Error closing PostgreSQL:', err.message);
   }
   process.exit(0);
 }

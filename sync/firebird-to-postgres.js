@@ -70,34 +70,33 @@ function fbDetach(db) {
 }
 
 /**
- * Resolve a node-firebird BLOB value (returned as a callback function) to a Buffer or string.
+ * Resolve a node-firebird TEXT BLOB (returned as a callback function) to a string.
+ * Times out after 5 seconds to avoid hanging on large/corrupt BLOBs.
  */
-function resolveBlob(blobFn) {
+function resolveTextBlob(blobFn) {
   return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => resolve(null), 5000);
     blobFn((err, name, event) => {
-      if (err) return reject(err);
+      if (err) { clearTimeout(timeout); return resolve(null); }
       const chunks = [];
       event.on('data', (chunk) => chunks.push(chunk));
-      event.on('end', () => resolve(Buffer.concat(chunks)));
-      event.on('error', reject);
+      event.on('end', () => {
+        clearTimeout(timeout);
+        resolve(Buffer.concat(chunks).toString('utf-8'));
+      });
+      event.on('error', () => { clearTimeout(timeout); resolve(null); });
     });
   });
 }
 
 /**
- * Resolve all BLOB values in a row to actual data.
- * node-firebird returns BLOB fields as functions — we must read them before inserting into PG.
+ * Resolve TEXT BLOB values in a row. Binary BLOBs (BYTEA) are skipped entirely.
  */
-async function resolveRowBlobs(row, columns) {
-  for (const col of columns) {
+async function resolveRowTextBlobs(row, textBlobCols) {
+  for (const col of textBlobCols) {
     const val = row[col.name];
     if (typeof val === 'function') {
-      try {
-        const buf = await resolveBlob(val);
-        row[col.name] = col.pgType === 'TEXT' ? buf.toString('utf-8') : buf;
-      } catch {
-        row[col.name] = null;
-      }
+      row[col.name] = await resolveTextBlob(val);
     }
   }
   return row;
@@ -175,30 +174,37 @@ async function syncTable(fbDb, pgPool, tableName) {
       return { table: tableName, rowCount: 0, status: 'skipped', durationMs: Date.now() - startTime };
     }
 
-    // 2. Ensure PG table exists
-    await ensurePgTable(pgPool, tableName, columns);
+    // 2. Filter out BYTEA columns (binary BLOBs are useless for Excel)
+    const syncColumns = columns.filter((c) => c.pgType !== 'BYTEA');
+    if (syncColumns.length === 0) {
+      return { table: tableName, rowCount: 0, status: 'skipped', durationMs: Date.now() - startTime };
+    }
 
-    // 3. Truncate PG table
+    // 3. Ensure PG table exists
+    await ensurePgTable(pgPool, tableName, syncColumns);
+
+    // 4. Truncate PG table
     await pgPool.query(`TRUNCATE TABLE "${tableName}"`);
 
-    // 4. Read all rows from Firebird
-    const rows = await fbQuery(fbDb, `SELECT * FROM "${tableName}"`);
+    // 5. Read all rows from Firebird (only non-BYTEA columns)
+    const selectCols = syncColumns.map((c) => `"${c.name}"`).join(', ');
+    const rows = await fbQuery(fbDb, `SELECT ${selectCols} FROM "${tableName}"`);
 
     if (!rows || rows.length === 0) {
       return { table: tableName, rowCount: 0, status: 'ok', durationMs: Date.now() - startTime };
     }
 
-    // 5. Resolve BLOB values (node-firebird returns them as callback functions)
-    const hasBlobCols = columns.some((c) => c.pgType === 'TEXT' || c.pgType === 'BYTEA');
-    if (hasBlobCols) {
+    // 6. Resolve TEXT BLOB values (node-firebird returns them as callback functions)
+    const textBlobCols = syncColumns.filter((c) => c.pgType === 'TEXT');
+    if (textBlobCols.length > 0) {
       for (const row of rows) {
-        await resolveRowBlobs(row, columns);
+        await resolveRowTextBlobs(row, textBlobCols);
       }
     }
 
-    // 6. Batch insert into PostgreSQL (dynamic batch size based on column count)
-    const batchSize = Math.min(MAX_BATCH_SIZE, Math.floor(MAX_PG_PARAMS / columns.length));
-    const colNames = columns.map((c) => `"${c.name}"`).join(', ');
+    // 7. Batch insert into PostgreSQL (dynamic batch size based on column count)
+    const batchSize = Math.min(MAX_BATCH_SIZE, Math.floor(MAX_PG_PARAMS / syncColumns.length));
+    const colNames = syncColumns.map((c) => `"${c.name}"`).join(', ');
     let inserted = 0;
 
     for (let i = 0; i < rows.length; i += batchSize) {
@@ -208,9 +214,9 @@ async function syncTable(fbDb, pgPool, tableName) {
 
       for (let rowIdx = 0; rowIdx < batch.length; rowIdx++) {
         const row = batch[rowIdx];
-        const rowPlaceholders = columns.map((col, colIdx) => {
+        const rowPlaceholders = syncColumns.map((col, colIdx) => {
           values.push(row[col.name] ?? null);
-          return `$${rowIdx * columns.length + colIdx + 1}`;
+          return `$${rowIdx * syncColumns.length + colIdx + 1}`;
         });
         placeholders.push(`(${rowPlaceholders.join(', ')})`);
       }

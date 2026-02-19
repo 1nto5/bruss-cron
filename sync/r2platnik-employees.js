@@ -49,13 +49,13 @@ async function syncR2platnikEmployees() {
 
     const employees = result.recordset.map(
       ({ Imie, Nazwisko, Identyfikator, DzialNazwa, GrupaNazwa, StanowiskoNazwa, Przelozony, Data_zatrudnienia, Data_zwolnienia }) => ({
-        firstName: Imie,
-        lastName: Nazwisko,
-        identifier: Identyfikator,
-        department: DzialNazwa || null,
-        shiftGroup: GrupaNazwa || null,
-        position: StanowiskoNazwa || null,
-        manager: Przelozony || null,
+        firstName: Imie?.trim(),
+        lastName: Nazwisko?.trim(),
+        identifier: Identyfikator?.trim(),
+        department: DzialNazwa?.trim() || null,
+        shiftGroup: GrupaNazwa?.trim() || null,
+        position: StanowiskoNazwa?.trim() || null,
+        manager: Przelozony?.trim() || null,
         hireDate: Data_zatrudnienia ? new Date(Data_zatrudnienia) : null,
         endDate: Data_zwolnienia ? new Date(Data_zwolnienia) : null,
       })

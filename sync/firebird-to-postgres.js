@@ -271,7 +271,7 @@ async function syncOneDatabase(config) {
  * Main sync function — called by cron job.
  * Syncs all configured Firebird databases to PostgreSQL.
  */
-export async function syncFirebirdToPostgres() {
+export async function syncCMMSFirebirdToPostgres() {
   const configs = getFirebirdConfigs();
   const summaries = [];
   const allErrors = [];

@@ -32,7 +32,7 @@ import { sendSupervisorMonthEndReport } from './overtime-submissions/send-superv
 import { syncLdapUsers } from './sync/ldap-users.js';
 import { syncR2platnikEmployees } from './sync/r2platnik-employees.js';
 import { generateDmcheckDefectsCsv } from './powerbi/generate-dmcheck-defects-csv.js';
-import { syncFirebirdToPostgres } from './sync/firebird-to-postgres.js';
+import { syncCMMSFirebirdToPostgres } from './sync/firebird-to-postgres.js';
 import { closeAllPools } from './lib/postgres.js';
 
 // Validate required environment variables at startup
@@ -131,7 +131,7 @@ const jobRegistry = [
   // DMCheck
   { feature: 'dmcheck',             schedule: '50 5,13 * * *',  name: 'generateDmcheckDefectsCsv',                   fn: generateDmcheckDefectsCsv },
   // Firebird → PostgreSQL sync
-  { feature: 'cmms-sync',           schedule: '0 2 * * *',      name: 'syncFirebirdToPostgres',                      fn: syncFirebirdToPostgres },
+  { feature: 'cmms-sync',           schedule: '0 2 * * *',      name: 'syncCMMSFirebirdToPostgres',                  fn: syncCMMSFirebirdToPostgres },
   // Oven
   { feature: 'oven',                schedule: '* * * * *',       name: 'logOvenTemperature',                          fn: logOvenTemperature },
 ];

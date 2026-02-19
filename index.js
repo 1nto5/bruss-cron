@@ -31,6 +31,7 @@ import { sendOvertimeSubmissionsApprovalReminders } from './overtime-submissions
 import { sendSupervisorMonthEndReport } from './overtime-submissions/send-supervisor-month-end-report.js';
 import { syncLdapUsers } from './sync/ldap-users.js';
 import { syncR2platnikEmployees } from './sync/r2platnik-employees.js';
+import { syncR2platnikEmployeeOptions } from './sync/r2platnik-employee-options.js';
 import { generateDmcheckDefectsCsv } from './powerbi/generate-dmcheck-defects-csv.js';
 import { syncCMMSFirebirdToPostgres } from './sync/firebird-to-postgres.js';
 import { closeAllPools } from './lib/postgres.js';
@@ -120,6 +121,7 @@ const jobRegistry = [
   { feature: 'hr-training',         schedule: '10 3 * * 1-5',   name: 'sendHrTrainingEvaluationNotifications',       fn: sendHrTrainingEvaluationNotifications },
   // Sync
   { feature: 'sync',                schedule: '0 16 * * 1-5',   name: 'syncR2platnikEmployees',                      fn: syncR2platnikEmployees },
+  { feature: 'sync',                schedule: '5 16 * * 1-5',   name: 'syncR2platnikEmployeeOptions',                fn: syncR2platnikEmployeeOptions },
   // Monitoring
   { feature: 'email-notifications', schedule: '*/15 * * * *',   name: 'monitorPm2ErrorLogs',                         fn: monitorPm2ErrorLogs },
   // Backup monitors

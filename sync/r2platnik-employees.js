@@ -29,34 +29,41 @@ async function syncR2platnikEmployees() {
     const employeesCollection = await dbc('employees');
 
     await sql.connect(sqlConfig);
-    const query =
-      'SELECT Imie, Nazwisko, Identyfikator FROM [dbo].[PRACOWNK] WHERE Identyfikator IS NOT NULL AND Skasowany = 0 AND (Data_zwolnienia > GETDATE() OR Data_zwolnienia IS NULL)';
+    const query = `
+      SELECT
+        p.Identyfikator, p.Imie, p.Nazwisko,
+        d.Nazwa AS DzialNazwa,
+        g.Nazwa AS GrupaNazwa,
+        s.Nazwa AS StanowiskoNazwa,
+        mgr.Imie + ' ' + mgr.Nazwisko AS Przelozony,
+        p.Data_zatrudnienia, p.Data_zwolnienia
+      FROM [dbo].[PRACOWNK] p
+      LEFT JOIN [dbo].[Dzial] d ON d.X_I = p.X_IDzial
+      LEFT JOIN [dbo].[grupy] g ON g.X_I = p.X_IGrupa
+      LEFT JOIN [dbo].[STANOW] s ON s.X_I = p.X_IStanowisko
+      LEFT JOIN [dbo].[PRACOWNK] mgr ON mgr.X_I = p.X_IPrzelozony
+      WHERE p.Identyfikator IS NOT NULL
+        AND p.Skasowany = 0
+        AND (p.Data_zwolnienia > GETDATE() OR p.Data_zwolnienia IS NULL)`;
     const result = await sql.query(query);
 
     const employees = result.recordset.map(
-      ({ Imie, Nazwisko, Identyfikator }) => ({
+      ({ Imie, Nazwisko, Identyfikator, DzialNazwa, GrupaNazwa, StanowiskoNazwa, Przelozony, Data_zatrudnienia, Data_zwolnienia }) => ({
         firstName: Imie,
         lastName: Nazwisko,
         identifier: Identyfikator,
+        department: DzialNazwa || null,
+        shiftGroup: GrupaNazwa || null,
+        position: StanowiskoNazwa || null,
+        manager: Przelozony || null,
+        hireDate: Data_zatrudnienia ? new Date(Data_zatrudnienia) : null,
+        endDate: Data_zwolnienia ? new Date(Data_zwolnienia) : null,
       })
     );
 
     processedEmployees = employees.length;
 
     if (employees.length > 0) {
-      // Get current employees to determine which ones are new
-      const currentEmployees = await employeesCollection
-        .find({}, { projection: { identifier: 1 } })
-        .toArray();
-      const currentIdentifiersSet = new Set(currentEmployees.map((emp) => emp.identifier));
-
-      // Track new employees
-      for (const emp of employees) {
-        if (!currentIdentifiersSet.has(emp.identifier)) {
-          addedEmployees++;
-        }
-      }
-
       const bulkOps = employees.map((emp) => ({
         updateOne: {
           filter: { identifier: emp.identifier },
@@ -65,7 +72,8 @@ async function syncR2platnikEmployees() {
         },
       }));
 
-      await employeesCollection.bulkWrite(bulkOps, { ordered: false });
+      const bulkResult = await employeesCollection.bulkWrite(bulkOps, { ordered: false });
+      addedEmployees = bulkResult.upsertedCount;
 
       // Get count of employees to be deleted (exclude external employees)
       const employeesToDelete = await employeesCollection.countDocuments({

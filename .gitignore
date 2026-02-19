@@ -186,3 +186,6 @@ synology-scripts/
 
 # Git worktrees
 .worktrees/
+
+# Project TODO
+TODO.md

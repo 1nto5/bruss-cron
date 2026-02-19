@@ -183,3 +183,6 @@ backups/
 
 # Synology Scripts
 synology-scripts/
+
+# Git worktrees
+.worktrees/

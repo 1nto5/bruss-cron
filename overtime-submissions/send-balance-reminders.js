@@ -50,14 +50,13 @@ export async function sendOvertimeSubmissionBalanceReminders() {
       if (!userEmail) continue;
 
       try {
-        const subject = 'Masz nierozliczone nadgodziny / You have unsettled overtime';
-        const messagePL = `Proszę o rozliczenie zaległych nadgodzin. Aktualne saldo: <strong>${totalHours}h</strong>.`;
-        const messageEN = `Please settle your outstanding overtime. Current balance: <strong>${totalHours}h</strong>.`;
+        const subject = 'Masz nierozliczone nadgodziny';
+        const message = `Proszę o rozliczenie zaległych nadgodzin. Aktualne saldo: <strong>${totalHours}h</strong>.`;
 
         const html = buildHtml(
-          `<p>${messagePL}</p><hr style="border:none;border-top:1px solid #ddd;margin:16px 0;"/><p>${messageEN}</p>`,
+          `<p>${message}</p>`,
           overtimeUrl,
-          'Przejdź do nadgodzin / Go to overtime'
+          'Przejdź do nadgodzin'
         );
 
         await axios.post(`${process.env.API_URL}/mailer`, {

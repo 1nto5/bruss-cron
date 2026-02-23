@@ -19,7 +19,7 @@ export async function sendOvertimeSubmissionBalanceReminders() {
     const pipeline = [
       {
         $match: {
-          status: { $nin: ['accounted', 'cancelled'] },
+          status: { $nin: ['cancelled'] },
           payment: { $ne: true },
           scheduledDayOff: { $exists: false },
         },

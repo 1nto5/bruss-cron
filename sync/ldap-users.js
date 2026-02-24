@@ -1,4 +1,5 @@
 import { dbc } from '../lib/mongo.js';
+import { country } from '../lib/plant.js';
 const LdapClientModule = await import('ldapjs-client');
 const LdapClient = LdapClientModule.default || LdapClientModule;
 
@@ -25,7 +26,7 @@ export async function syncLdapUsers() {
 
     // Single search with PL filter
     const options = {
-      filter: '(&(mail=*)(c=PL))',
+      filter: `(&(mail=*)(c=${country}))`,
       scope: 'sub',
       attributes: ['mail', 'dn'],
     };

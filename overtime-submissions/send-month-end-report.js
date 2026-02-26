@@ -31,7 +31,6 @@ export async function sendOvertimeSubmissionMonthEndReport() {
         $group: {
           _id: '$submittedBy',
           totalHours: { $sum: '$hours' },
-          count: { $sum: 1 },
         },
       },
       { $match: { totalHours: { $ne: 0 } } },
@@ -50,7 +49,6 @@ export async function sendOvertimeSubmissionMonthEndReport() {
       email: u._id,
       displayName: extractFullNameFromEmail(u._id),
       hours: u.totalHours,
-      count: u.count,
     }));
 
     const plantManagers = await usersColl.find({ roles: { $in: ['plant-manager'] } }).toArray();

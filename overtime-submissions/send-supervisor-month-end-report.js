@@ -29,7 +29,6 @@ export async function sendSupervisorMonthEndReport() {
         $group: {
           _id: { supervisor: '$supervisor', employee: '$submittedBy' },
           totalHours: { $sum: '$hours' },
-          count: { $sum: 1 },
         },
       },
       { $match: { totalHours: { $ne: 0 } } },
@@ -40,7 +39,6 @@ export async function sendSupervisorMonthEndReport() {
             $push: {
               email: '$_id.employee',
               hours: '$totalHours',
-              count: '$count',
             },
           },
         },
@@ -67,7 +65,6 @@ export async function sendSupervisorMonthEndReport() {
             email: e.email,
             displayName: extractFullNameFromEmail(e.email),
             hours: e.hours,
-            count: e.count,
           }))
           .sort((a, b) => b.hours - a.hours);
 

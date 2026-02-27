@@ -120,8 +120,8 @@ const jobRegistry = [
   { feature: 'overtime',            schedule: '0 4 28-31 * *',  name: 'sendOvertimeSubmissionMonthEndReport',        fn: sendOvertimeSubmissionMonthEndReport },
   // HR training
   { feature: 'hr-training',         schedule: '10 3 * * 1-5',   name: 'sendHrTrainingEvaluationNotifications',       fn: sendHrTrainingEvaluationNotifications },
-  // Competency matrix
-  { feature: 'email-notifications', schedule: '0 6 * * 1-5',    name: 'sendContractEndEvaluationNotifications',      fn: sendContractEndEvaluationNotifications },
+  // Competency matrix - disabled until manager emails are available
+  // { feature: 'email-notifications', schedule: '0 6 * * 1-5',    name: 'sendContractEndEvaluationNotifications',      fn: sendContractEndEvaluationNotifications },
   // Sync
   { feature: 'sync',                schedule: '0 16 * * 1-5',   name: 'syncR2platnikEmployees',                      fn: syncR2platnikEmployees },
   { feature: 'sync',                schedule: '5 16 * * 1-5',   name: 'syncR2platnikEmployeeOptions',                fn: syncR2platnikEmployeeOptions },

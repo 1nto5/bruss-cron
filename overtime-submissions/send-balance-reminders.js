@@ -22,6 +22,7 @@ export async function sendOvertimeSubmissionBalanceReminders() {
           status: { $nin: ['cancelled'] },
           payment: { $ne: true },
           scheduledDayOff: { $exists: false },
+          deletedAt: { $exists: false },
         },
       },
       {

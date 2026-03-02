@@ -15,13 +15,13 @@ async function sendOvertimeOrdersApprovalReminders() {
     const usersColl = await dbc('users');
 
     const pendingNonLogistics = await coll
-      .find({ status: 'pending', department: { $ne: 'logistics' } })
+      .find({ status: 'pending', department: { $ne: 'logistics' }, deletedAt: { $exists: false } })
       .toArray();
 
     const pendingLogistics = await coll
-      .find({ status: 'pending', department: 'logistics' })
+      .find({ status: 'pending', department: 'logistics', deletedAt: { $exists: false } })
       .toArray();
-    const preApprovedOrders = await coll.find({ status: 'pre_approved' }).toArray();
+    const preApprovedOrders = await coll.find({ status: 'pre_approved', deletedAt: { $exists: false } }).toArray();
 
     pendingForPreApproval = pendingNonLogistics.length;
     pendingForFinalApproval = pendingLogistics.length + preApprovedOrders.length;
@@ -118,6 +118,7 @@ async function sendOvertimeOrdersAttendanceReminders() {
         responsibleEmployee: { $exists: true, $ne: null, $ne: '' },
         from: { $lte: yesterday },
         to: { $lte: yesterday },
+        deletedAt: { $exists: false },
       })
       .toArray();
 

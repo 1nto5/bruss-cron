@@ -13,7 +13,7 @@ async function sendOvertimeSubmissionsApprovalReminders() {
     // Group pending submissions by supervisor
     const pendingBySupervisor = await coll
       .aggregate([
-        { $match: { status: 'pending' } },
+        { $match: { status: 'pending', deletedAt: { $exists: false } } },
         { $group: { _id: '$supervisor', count: { $sum: 1 } } },
       ])
       .toArray();

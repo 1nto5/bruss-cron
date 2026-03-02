@@ -25,6 +25,7 @@ export async function sendOvertimeSubmissionMonthEndReport() {
           status: 'approved',
           payment: { $ne: true },
           scheduledDayOff: { $exists: false },
+          deletedAt: { $exists: false },
         },
       },
       {

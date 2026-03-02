@@ -14,6 +14,7 @@ async function sendIndividualOvertimeOrdersApprovalReminders() {
     // Count orders awaiting plant manager approval (payout orders)
     const pendingPlantManagerCount = await coll.countDocuments({
       status: 'pending-plant-manager',
+      deletedAt: { $exists: false },
     });
 
     pendingForPlantManagers = pendingPlantManagerCount;

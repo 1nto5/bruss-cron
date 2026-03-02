@@ -23,6 +23,7 @@ export async function sendSupervisorMonthEndReport() {
           status: 'approved',
           payment: { $ne: true },
           scheduledDayOff: { $exists: false },
+          deletedAt: { $exists: false },
         },
       },
       {

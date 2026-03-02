@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "test": "bun test",
-    "start": "node index.js"
+    "start": "node index.js",
+    "postinstall": "node scripts/patch-deps.js"
   },
   "devDependencies": {},
   "peerDependencies": {},

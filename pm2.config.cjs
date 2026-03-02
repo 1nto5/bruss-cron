@@ -4,6 +4,7 @@ module.exports = {
       name: 'bruss-cron',
       script: './index.js',
       interpreter: 'node',
+      interpreter_args: '--openssl-legacy-provider',
       max_memory_restart: '2G',
       kill_timeout: 5000,
       restart_delay: 3000,

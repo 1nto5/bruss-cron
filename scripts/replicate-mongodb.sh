@@ -334,55 +334,73 @@ confirm_operation() {
 dump_production() {
     step 2 "Dumping production database"
 
-    local dump_args=(
-        --uri="$SOURCE_URI"
-        --db="$SOURCE_DB"
-        --out="$TEMP_DUMP_DIR"
-        --gzip
-    )
-
     if [[ -n "$COLLECTIONS" ]]; then
+        # mongodump --collection only accepts one collection at a time,
+        # so we loop and run a separate dump per collection
         IFS=',' read -ra COLLECTION_ARRAY <<< "$COLLECTIONS"
         for collection in "${COLLECTION_ARRAY[@]}"; do
-            dump_args+=(--collection="$collection")
+            local dump_args=(
+                --uri="$SOURCE_URI"
+                --db="$SOURCE_DB"
+                --out="$TEMP_DUMP_DIR"
+                --gzip
+                --collection="$collection"
+            )
+
+            log_info "Dumping collection: $collection"
+
+            if [[ "$VERBOSE" == "true" ]]; then
+                mongodump "${dump_args[@]}"
+            else
+                mongodump "${dump_args[@]}" 2>&1 | grep -E "(done dumping|writing)" | while read -r line; do
+                    echo "  📦 $line"
+                done
+            fi
         done
-    fi
-
-    if [[ -n "$EXCLUDE_COLLECTIONS" ]]; then
-        IFS=',' read -ra EXCLUDE_ARRAY <<< "$EXCLUDE_COLLECTIONS"
-        for collection in "${EXCLUDE_ARRAY[@]}"; do
-            dump_args+=(--excludeCollection="$collection")
-        done
-    fi
-
-    if [[ "$SKIP_ARCHIVE" == "true" ]]; then
-        log_info "Getting list of collections to identify archive collections..."
-        local archive_collections
-        archive_collections=$(mongosh --quiet "$SOURCE_URI" --eval "
-            db.getSiblingDB('$SOURCE_DB').getCollectionNames().filter(name => name.includes('archive')).forEach(name => print(name))
-        " 2>/dev/null || true)
-
-        if [[ -n "$archive_collections" ]]; then
-            log_info "Found archive collections to exclude: $archive_collections"
-            while IFS= read -r collection; do
-                if [[ -n "$collection" ]]; then
-                    dump_args+=(--excludeCollection="$collection")
-                    log_info "Excluding archive collection: $collection"
-                fi
-            done <<< "$archive_collections"
-        else
-            log_info "No archive collections found to exclude"
-        fi
-    fi
-
-    log_info "Starting mongodump with args: ${dump_args[*]}"
-
-    if [[ "$VERBOSE" == "true" ]]; then
-        mongodump "${dump_args[@]}"
     else
-        mongodump "${dump_args[@]}" 2>&1 | grep -E "(done dumping|writing)" | while read -r line; do
-            echo "  📦 $line"
-        done
+        local dump_args=(
+            --uri="$SOURCE_URI"
+            --db="$SOURCE_DB"
+            --out="$TEMP_DUMP_DIR"
+            --gzip
+        )
+
+        if [[ -n "$EXCLUDE_COLLECTIONS" ]]; then
+            IFS=',' read -ra EXCLUDE_ARRAY <<< "$EXCLUDE_COLLECTIONS"
+            for collection in "${EXCLUDE_ARRAY[@]}"; do
+                dump_args+=(--excludeCollection="$collection")
+            done
+        fi
+
+        if [[ "$SKIP_ARCHIVE" == "true" ]]; then
+            log_info "Getting list of collections to identify archive collections..."
+            local archive_collections
+            archive_collections=$(mongosh --quiet "$SOURCE_URI" --eval "
+                db.getSiblingDB('$SOURCE_DB').getCollectionNames().filter(name => name.includes('archive')).forEach(name => print(name))
+            " 2>/dev/null || true)
+
+            if [[ -n "$archive_collections" ]]; then
+                log_info "Found archive collections to exclude: $archive_collections"
+                while IFS= read -r collection; do
+                    if [[ -n "$collection" ]]; then
+                        dump_args+=(--excludeCollection="$collection")
+                        log_info "Excluding archive collection: $collection"
+                    fi
+                done <<< "$archive_collections"
+            else
+                log_info "No archive collections found to exclude"
+            fi
+        fi
+
+        log_info "Starting mongodump with args: ${dump_args[*]}"
+
+        if [[ "$VERBOSE" == "true" ]]; then
+            mongodump "${dump_args[@]}"
+        else
+            mongodump "${dump_args[@]}" 2>&1 | grep -E "(done dumping|writing)" | while read -r line; do
+                echo "  📦 $line"
+            done
+        fi
     fi
 
     local dump_size=$(du -sh "$TEMP_DUMP_DIR" | cut -f1)

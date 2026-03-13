@@ -13,6 +13,7 @@ export async function syncLdapUsers() {
   // Initialize counters
   let addedUsers = 0;
   let deletedUsers = 0;
+  let skippedUsers = 0;
   let processedUsers = 0;
 
   try {
@@ -70,9 +71,26 @@ export async function syncLdapUsers() {
     // Remove users who no longer exist in LDAP (single atomic query)
     if (activeEmails.size > 0) {
       try {
+        const usersWithCustomRoles = await usersCollection
+          .find({
+            email: { $nin: Array.from(activeEmails) },
+            source: { $ne: 'manual' },
+            roles: { $elemMatch: { $ne: 'user' } },
+          }, { projection: { email: 1, roles: 1 } })
+          .toArray();
+
+        if (usersWithCustomRoles.length > 0) {
+          skippedUsers = usersWithCustomRoles.length;
+          console.warn(
+            `syncLdapUsers -> skipped deletion for ${skippedUsers} user(s) with custom roles (not in LDAP):`,
+            usersWithCustomRoles.map((u) => `${u.email} [${u.roles.join(', ')}]`).join(', ')
+          );
+        }
+
         const deleteResult = await usersCollection.deleteMany({
           email: { $nin: Array.from(activeEmails) },
           source: { $ne: 'manual' }, // preserve manual users
+          roles: { $not: { $elemMatch: { $ne: 'user' } } }, // skip users with custom roles
         });
         deletedUsers = deleteResult.deletedCount;
       } catch (cleanupError) {
@@ -97,7 +115,7 @@ export async function syncLdapUsers() {
       }
     }
     console.log(
-      `syncLdapUsers -> success at ${new Date().toLocaleString()} | Processed: ${processedUsers}, Added: ${addedUsers}, Deleted: ${deletedUsers}`
+      `syncLdapUsers -> success at ${new Date().toLocaleString()} | Processed: ${processedUsers}, Added: ${addedUsers}, Deleted: ${deletedUsers}, Skipped: ${skippedUsers}`
     );
   }
 }
